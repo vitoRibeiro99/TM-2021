@@ -1,0 +1,23 @@
+Exercício Inicial
+
+1. Utilize o Github para fazer um fork ao Repositório:
+ - https://github.com/Ricardo-Guia/TM-2021
+Assim terás um repositório na tua conta Github, com base no da disciplina.
+
+2. 
+  2.1) Faz Loggin no github desktop com a tua conta
+  2.2) Faz clone do teu repositorio:
+  2.3) Escolhe uma pasta no teu computador para ter o repositorio da disciplina
+  2.4) Dentro do teu repositorio, cria uma pasta com o a seguinte Máscara para a aula em questão 
+ - Aula01/[Nome]-[Numero Aluno] Exemplo: Aula01/RicardoGuia-21301
+
+3. Utilize o Intellij para criar um novo Projeto na pasta criada acima ( [Nome]-[Numero Aluno] )
+
+4. Criar um ficheiro javascript, com o nome do aluno, apenas criando uma variável
+exemplo : 
+ var variable = "Hello World";
+ console.log(variable);
+ alert(variable);
+
+5. Submeter ou fazer Commit dos ficheiros criados, e fazer PullRequest com a seguinte máscara:
+ -  Aula01-[Nome]-[No de Aluno]
