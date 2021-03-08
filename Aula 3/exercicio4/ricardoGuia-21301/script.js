@@ -16,5 +16,6 @@ function addImage ()
 
 function delImage ()
 {
-
+	const images = document.getElementById("imageContainer")
+	images.children[0].remove()
 }
