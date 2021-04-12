@@ -1,0 +1,2951 @@
+<div class = "coursepage" id = "coursepage01">
+<h1>Build a HTML5 cross-platform portrait project</h1>
+<p>We are going to build a Phaser project for a cross-platform game which can also be used as a blank template for your future projects.</p>
+<div class="alert alert-success" role="alert">
+    <ul>
+        <li><strong>What we want</strong>: a cross-platform empty game project.</li>
+        <li><strong>How we do it</strong>: HTML5 cross-platform games are HTML pages powered by JavaScript rendering on canvas, so we are going to build a HTML page capable of running JavaScript and Phaser framework.</li>
+    </ul>
+</div>
+<p>Before we start, let's have a look at the final folder structure of the project:</p>
+<p><img src = "images/01/tree.png"></p>
+<p>There is a folder called <code>assets</code> with three subfolders called <code>fonts</code>, <code>sounds</code> and <code>sprites</code>, each one with its respective resources.</p>
+<p>The root is populated by <code>index.html</code> which is the web page running the game, <code>phaser.min.js</code> containing Phaser framework, <code>game.js</code> which contains the game itself and <code>favicon.png</code> which is the PNG image used as favicon.</p>
+<p>Here it is the 256x256 pixels favicon:</p>
+<p><img src = "images/01/favicon.png"></p>
+<p>You can organize the project as you want, just remember to change the paths in my code with yours as this is how I am going to organize the game towards the course.</p>
+<div class="alert alert-warning" role="alert">
+    <p>A little note about <code>game.js</code>: writing the whole game into a single file may seem a malpractice, because it should be organized in more files: a file to render sprites, a file to handle input, and so on.</p>
+    <p>Unfortunately most game sponsors want the entire game to fit in just one file and may not accept your game if the code is scattered through a dozen files, and since finding a sponsor – someone willing to pay for your hard work – is a top priority, try to write the entire game in one single file.</p>
+</div>
+<p>This is the content of <code>index.html</code>:</p>
+<pre><code class="language-html">&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+    &lt;head&gt;
+        &lt;title&gt;Irresponsible Ninja&lt;/title&gt;
+        &lt;meta name = "viewport" content = "width = device-width, initial-scale = 1.0, maximum-scale = 1.0, minimum-scale = 1.0, user-scalable = 0, minimal-ui" /&gt;
+        &lt;link rel = "shortcut icon" type = "image/png" href = "favicon.png"/&gt;
+        &lt;style type = "text/css"&gt;
+            * {
+                padding: 0;
+                margin: 0;
+            }
+            body{
+                background: #000000;
+            }
+            canvas {
+                touch-action-delay: none;
+                touch-action: none;
+                -ms-touch-action: none;
+            }
+        &lt;/style&gt;
+        &lt;script src = "phaser.min.js"&gt;&lt;/script&gt;
+        &lt;script src = "game.js"&gt;&lt;/script&gt;
+    &lt;/head&gt;
+    &lt;body&gt;
+
+        &lt;!-- remember the id: "thegame" --&gt;
+        &lt;div id = "thegame"&gt;&lt;/div&gt;
+    &lt;/body&gt;
+&lt;/html&gt;</code></pre>
+<p>As you can see, <code>index.html</code> is just a web page tailored to work both on desktop and mobile browsers, and there is only one line I want you to notice: the one with the <code>&lt;div&gt;</code> whose <code>id</code> attribute is <code>thegame</code>.</p>
+<p>It's used as the container of the <code>&lt;canvas&gt;</code> element which hosts the game.</p>
+<p>Once <code>index.html</code> has been created, we can focus on <code>game.js</code> and start building the game.</p>
+<pre><code class="language-javascript">// the game itself
+let game;
+
+// object containing all customizable options, stored in a single place so you can
+// easily change the gameplay by etiding a single piece of code
+let gameOptions = {
+
+    // another object with the default size
+    defaultSize: {
+
+        // width of the game in the perfect scenario, in pixels
+        width: 750,
+
+        // height of the game in the perfect scenario, in pixels
+        height: 1334,
+
+        // maximum aspect ratio supported, a landscape iPad.
+        // More than enough for a portrait game
+        maxRatio: 4 / 3
+    }
+}
+
+// function to be executed when the window loads
+window.onload = function() {
+
+    // get optimal window's width and height
+    let width = gameOptions.defaultSize.width;
+    let height = gameOptions.defaultSize.height;
+
+    // this is the best case aspect ratio
+    let perfectRatio = width / height;
+
+    // actual window's width and height
+    let innerWidth = window.innerWidth;
+    let innerHeight = window.innerHeight;
+
+    // actual width and height ratio
+    let actualRatio = Math.min(innerWidth / innerHeight, gameOptions.defaultSize.maxRatio);
+
+    // if perfect ratio is greater than actual ratio...
+    if(perfectRatio > actualRatio){
+
+        // ... then adjust height
+        height = width / actualRatio;
+    }
+    else{
+
+        // ... otherwise adjust width
+        width = height * actualRatio;
+    }
+
+    // game configuration object
+    let gameConfig = {
+
+        // render type, sets the type of renderer used to draw on the canvas.
+        // You can choose among Phaser.AUTO, Phaser.CANVAS, Phaser.HEADLESS, Phaser.WEBGL
+        type: Phaser.AUTO,
+
+        // scale object hadles the way the game is scaled and aligned
+        scale: {
+
+            // scale mode sets the aspect mode.
+            // FIT mode is likely to be the one you are looking for, as it works in most cases.
+            // Modes you may want to play with are:
+            // NONE: no scaling at all.
+            // WIDTH_CONTROLS_HEIGHT: height is automatically adjusted based on the width.
+            // HEIGHT_CONTROLS_WIDTH: width is automatically adjusted based on the height.
+            // FIT: width and height are automatically adjusted to fit inside the given target area, while keeping the aspect ratio.
+            // Depending on the aspect ratio there may be some space inside the area which is not covered.
+            // ENVELOP: width and height are automatically adjusted to make the size cover the entire target area while keeping the aspect ratio.
+            // This may extend further out than the target size.
+            // RESIZE: the canvas is resized to fit all available parent space, regardless of aspect ratio.
+            mode: Phaser.Scale.FIT,
+
+            // center the game horizontally and vertically
+            // available options are:
+            // CENTER_BOTH: game canvas automatically centered.
+            // NO_CENTER: don't center game canvas
+            // CENTER_HORIZONTALLY: center game canvas horizontally
+            // CENTER_VERTICALLY: center game canvas vertically
+            autoCenter: Phaser.Scale.CENTER_BOTH,
+
+            // element ID where to render the game. Remember? The &lt;div&gt; in index.html
+            parent: "thegame",
+
+            // game width, in pixels
+            width: width,
+
+            // game height, in pixels
+            height: height
+        },
+
+        // background color
+        backgroundColor: 0x132c43
+    }
+
+    // creation of the game itself
+    game = new Phaser.Game(gameConfig);
+
+    // give focus to window
+    window.focus();
+}</code></pre>
+<p>A little more code here, mostly JavaScript with some configuration options.</p>
+<p>Let's see what happens:</p>
+<p><code>game</code> is the global variable which hosts the game itself, while <code>gameOptions</code> is a global object containing a series of parameters we may need to change to adjust gameplay to fit our needs.</p>
+<div class="alert alert-warning" role="alert">
+    <p>Having all important parameters stored in the same place makes source code more readable, but above all makes the script a lot easier to modify if we decide to change some of these values: no more "search and replace" operations all over the entire script, just a single value to change in one single place.</p>
+</div>
+<p>Inside <code>gameOptions</code> we find another object called <code>defaultSize</code>.</p>
+<p>Here we store our perfect scenario width and height, set to 750x1334 because it's the resolution used by a lot of iPhone models and also has a 9/16 aspect ratio, portrait mode.</p>
+<p>As we don't live in a perfect world, we have to deal with different screen ratios.</p>
+<p>That's when <code>maxRatio</code> comes into play. This is the max screen ratio we cover: enough for an iPad in landscape mode, and still nice to see on a 16/9 laptop monitor.</p>
+<p>Once <code>window.onload</code> event is fired – when the entire page loads, including its content – we start building the game.</p>
+<div class="alert alert-primary" role="alert">
+    <h3><code>window.onload</code></h3>
+    <p>Event which fires after all objects in the DOM hierarchy (images, scripts, frames, and so on) have finished loading and the document object has been built up.</p>
+</div>
+<p><code>perfectRatio</code> is the aspect ratio of our ideal game, given by our preferred width divided by our preferred height.</p>
+<p><code>actualRatio</code> is the minimum value between actual window ratio and <code>maxRatio</code>.</p>
+<p>The difference between <code>perfectRatio</code> and <code>actualRatio</code> lets us know whether we are playing on a taller or on a wider screen, and adjust height or width accordingly.</p>
+<div class="alert alert-primary" role="alert">
+    <h3><code>window.innerWidth</code>, <code>window.innerHeight</code></h3>
+    <p>The inner width or height of the window's content area.</p>
+</div>
+<p>Finally we meet the first Phaser-related code: <code>gameConfig</code> object which contains the information we send to Phaser during the creation of the game.</p>
+<p>Finally the game is created with <code>Phaser.Game(gameConfig)</code> with <code>gameConfig</code> as argument.</p>
+<p>From now on, we have the game up and running.</p>
+<div class="alert alert-primary" role="alert">
+    <h3><code>Phaser.Game(gameConfig)</code></h3>
+    <p>Main controller for the entire Phaser game.</p>
+    <p>It is responsible for handling the boot process, parsing the configuration values, creating the renderer, and setting-up all of the global Phaser systems, such as sound and input.</p>
+    <p>Once complete it starts the Scene Manager and then begin the main game loop.</p>
+</div>
+<p>We also ensure game window gets focus.</p>
+<div class="alert alert-primary" role="alert">
+    <h3><code>window.focus()</code></h3>
+    <p>Assures that the window gets focus, sending it to the front.</p>
+</div>
+<p>Try to resize the game on the right: the blue background rectangle is actually the game itself, and it perfectly fits any portrait mode and some landscapes until iPad 4/3 landscape.</p>
+<p>You will see black bars when you launch the game with an aspect ratio wider than 4/3.</p>
+<p>It's possible to cover landscape screens too, but remember it's a portrait game so there's no need to support wide screens.</p>
+<p>On mobile phones you can lock the orientation or suggest to rotate the device, while desktop browsers games are usually embedded in iframes and surrounded by ads so there's no need to cover the entire 16/9 area for this genre of game.</p>
+</div>
+
+<div class = "coursepage" id = "coursepage02">
+<h1>Create Scenes then preload and add images to the game</h1>
+<p>Time to replace that flat blue background with something more interesting.<p>
+<div class="alert alert-success" role="alert">
+    <ul>
+        <li><strong>What we want</strong>: a scene with a gradient background.</li>
+        <li><strong>How we do it</strong>: we have to load an image and add it to the game, then resize it to cover the entire canvas.</li>
+    </ul>
+</div>
+<p>We created a gradient background representing the sky.</p>
+<p>It's a 4x512 gradient PNG image saved as <code>assets/sprites/background.png</code>:</p>
+<p><img src = "images/02/background.png"></p>
+<p>We are now ready to add Scenes to our game, declared inside <code>gameConfig</code> object:</p>
+<pre data-line="12,13"><code class="language-javascript">let gameConfig = {
+    type: Phaser.AUTO,
+    scale: {
+        mode: Phaser.Scale.FIT,
+        autoCenter: Phaser.Scale.CENTER_BOTH,
+        parent: "thegame",
+        width: width,
+        height: height
+    },
+    backgroundColor: 0x132c43,
+
+    // array with game scenes
+    scene: [preloadGame, playGame]
+}</code></pre>
+<p><code>scene</code> is an array containing all Scenes used in the game.</p>
+<div class="alert alert-primary" role="alert">
+    <p>An <strong>array</strong> is a special variable, which can hold more than one value at a time, under a single variable name, and you can access the values by referring to an index number.</p>
+</div>
+<p>The first scene in the array is the scene which is executed at the beginning of the game.</p>
+<div class="alert alert-warning" role="alert">
+    <p>What is a Scene? Let's think about a game, one of the games you are playing these days.</p>
+    <p>I don't know which games you are playing, but I bet they all have at least a title screen, a screen with the game itself, a credits screen, a game over screen and maybe some other screens, according to game complexity.</p>
+    <p>Each "screen" can be developed as a Phaser Scene.</p>
+    <p>A hyper-casual game like Irresponsible Ninja has only two Scenes: one preloading all game assets, and one to handle the game itself.</p>
+</div>
+<p>From a coding point of view, a Scene is just a class which extends <code>Phaser.Scene</code> built-in class.</p>
+<p>Let's write <code>preloadGame</code> Scene:</p>
+<pre><code class="language-javascript">// the scene is just a JavaScript class, so we are going to extend it
+class preloadGame extends Phaser.Scene{
+
+    // class constructor
+    constructor(){
+        super("PreloadGame");
+    }
+
+    // method automatically executed by Phaser when the scene preloads
+    preload(){
+
+        // load background image and assign it "background" key
+        this.load.image("background", "assets/sprites/background.png");
+    }
+
+    // method automatically executed by Phaser once the scene has been created,
+    // often immediately after "preload" method
+    create(){
+
+        // launch "PlayGame" scene
+        this.scene.start("PlayGame");
+    }
+}</code></pre>
+<p><code>preloadGame</code> class has two methods: <code>preload</code> and <code>create</code>.</p>
+<p>Inside <code>preload</code> method, all game assets - just the gradient background the moment - are preloaded.</p>
+<div class="alert alert-primary" role="alert">
+    <h3><code>load.image(key, url)</code></h3>
+    <p>Loads an image, with two arguments: the unique asset key of the image file and the URL of the image.</p>
+</div>
+<p>Then <code>create</code> method just launches next scene.</p>
+<div class="alert alert-primary" role="alert">
+    <h3><code>scene.start(key)</code></h3>
+    <p>Starts the scene identified by the unique <code>key</code> name, which is the same name you declared in the constructor with <code>super(key)</code>.</p>
+</div>
+<p>Now we have the background image preloaded and ready to be used.</p>
+<p>Let's write <code>playGame</code> class in the same way we did with <code>preloadGame</code>:
+<pre><code class="language-javascript">class playGame extends Phaser.Scene{
+
+    // class constructor
+    constructor(){
+        super("PlayGame");
+    }
+
+    // method automatically executed by Phaser once the scene has been created
+    create(){
+
+        // custom method to add background image
+        this.addBackground();
+    }
+
+    // method to add background image
+    addBackground(){
+
+        // add background image as sprite, at coordinates x: -50, y: - 50
+        let background = this.add.sprite(-50, -50, "background");
+
+        // set background sprite origin - or registration point - to top left corner
+        background.setOrigin(0, 0);
+
+        // set background sprite display width to game width + 100 pixels
+        background.displayWidth = game.config.width + 100;
+
+        // set background sprite display height to game height + 100 pixels
+        background.displayHeight = game.config.height + 100;
+    }
+}</code></pre>
+<p>No need to call <code>preload</code> method here, as background image has already been preloaded.</p>
+<p>A sprite is added to the canvas at a given <code>x</code>, <code>y</code> position using the key we assigned to the image when we preloaded it.</p>
+<div class="alert alert-primary" role="alert">
+    <h3><code>add.sprite(x, y, key, frame)</code></h3>
+    <p>Places an image on the stage and wants as arguments the x coordinate of the image, in pixels, the y coordinate of the image, in pixels, the key of the image used and optionally the number of the frame to display, if a sprite sheet is used. Default value is zero.</p>
+</div>
+<p>We also set its origin – or anchor point – to top left corner (0, 0) and set its display width and height to cover a little more than the entire game area, because we go from -50 to game width (or height) + 100.</p>
+<div class="alert alert-primary" role="alert">
+    <h3><code>setOrigin(x, y)</code></h3>
+    <p>Sets image origin to <code>x</code>, <code>y</code>.
+    <p>The anchor or origin of an image or sprite sets the origin point of the image. When you add an image at x, y you actually add an image in a position so that its origin is x, y. Setting the origin to 0.5, 0.5 – which is also the default value  – means the image origin is the center of the image. Setting the origin to 1, 1 means the image origin is on the bottom right corner. Setting the origin to 0, 0 means the image origin is on the top left corner. Any value from 0 to 1 is accepted.</p>
+</div>
+<div class="alert alert-warning" role="alert">
+    <p>Why are we covering more than game area? Because later we'll add a shake effect, everything will be moved here and there - background image included - so we need the background to be a bit larger than game area to avoid revealing the default canvas color while it's being shaked.</p>
+</div>
+<p>On the right, you can see the game area covered by the background gradient image.</p>
+<p>Try to scale the game, background always covers the entire game area.</p>
+</div>
+
+<div class = "coursepage" id = "coursepage03">
+<h1>Add randomly animated clouds</h1>
+<p>A sky is not a sky without some clouds.</p>
+<div class="alert alert-success" role="alert">
+    <ul>
+        <li><strong>What we want</strong>: randomly animated clouds.</li>
+        <li><strong>How we do it</strong>: clouds are loaded as a spritesheet and randomly animated with a tween.</li>
+    </ul>
+</div>
+<p>Thanks to Phaser tweens, we are able to create animated clouds starting from this 512x256 image representing two circles.</p>
+<p>This is the image saved in <code>assets/sprites/cloud.png</code>, green background has been added to show you the transparency.</p>
+<p><img src = "images/03/cloud.png"></p>
+<p>Both circles have the same size so they have been placed in a single image.</p>
+<div class="alert alert-warning" role="alert">
+    <p>Why placing two circles in the same image rather than using two images, one for each circle?</p>
+    <p>Every game is made by various images. Each image is a set of pixels, and each pixel requires some memory to hold its color information.</p>
+    <p>Graphic engines must know which image to paint, get the image from the place where it's stored, then know which part of the image to paint – normally the entire image – and where to paint it, and finally place it on the screen.</p>
+    <p>This process needs to be repeated for each image, until all images have been placed.</p>
+    <p>Normally you don't notice it because it happens in 1/60 second, but placing a lot of images can slow down performance.</p>
+    <p>Using a sprite sheet, you have most of your images placed into a big image, inside an invisible grid, in order to avoid the "what image should I load" question, leaving only "which part of the image should I paint" question, and speeding up drawing process.</p>
+</div>
+<p>Let's preload the sprite sheet in <code>preload</code> method of <code>preloadGame</code> class:</p>
+<pre data-line = "4-12"><code class="language-javascript">preload(){
+    this.load.image("background", "assets/sprites/background.png");
+
+    // load a sprite sheet and assign it "cloud" key
+    this.load.spritesheet("cloud", "assets/sprites/cloud.png", {
+
+        // frame width, in pixels
+        frameWidth: 256,
+
+        // frame height, in pixels
+        frameHeight: 256
+    });
+}</code></pre>
+<p>A sprite sheet is loaded in the same way as an image, we just need an extra argument: an object where to declare the width and the height of the invisible grid which splits the image into tiles.</p>
+<div class="alert alert-primary" role="alert">
+    <h3><code>load.spritesheet(key, url, config)</code></h3>
+    <p>Loads a sprite sheet and wants as arguments respectively the unique asset key of the file, the URL to load the texture file from and a configuration object with <code>frameWidth</code> value representing the frame width of each tile, in pixels, and <code>frameHeight</code> value representing the frame height of each tile, in pixels.
+</div>
+<p>Now inside <code>create</code> method of <code>playGame</code> class add another method: <code>addClouds</code>.</p>
+<pre data-line="3"><code class="language-javascript">create(){
+    this.addBackground();
+    this.addClouds();
+}</code></pre>
+<p>And this is <code>addClouds</code> method:</p>
+<pre><code class="language-javascript">addClouds(){
+
+    // clouds is the amount of cloud images needed to cover the entire game width
+    let clouds = Math.ceil(game.config.width / 128);
+
+    // we store clouds in cloudsArray array
+    let cloudsArray = [];
+
+    // this loop is executed twice because we want two rows of clouds
+    for(let i = 0; i <= 1; i ++){
+
+        // this loop is executed "cloud" times
+        for(let j = 0; j <= clouds; j ++){
+
+            // add cloud image to the game with a bit of randomization in its position
+            let cloud = this.add.sprite(128 * j + Phaser.Math.Between(-10, 10), game.config.height + i * 32 + Phaser.Math.Between(-10, 10), "cloud");
+
+            // set cloud frame
+            cloud.setFrame(i);
+
+            // insert the cloud in cloudsArray array
+            cloudsArray.push(cloud);
+        }
+    }
+
+    // tween the clouds
+    this.tweens.add({
+
+        // array containing game objects to tween: all clouds
+        targets: cloudsArray,
+
+        // properties to tween
+        props: {
+
+            // x property (horizontal position)
+            x: {
+
+                // how do we change the value?
+                value: {
+
+                    // once we have the position at the end of the tween...
+                    getEnd: function(target, key, value){
+
+                        // ... move it for a little amount of pixels
+                        return target.x + Phaser.Math.Between(-10, 10)
+                    }
+                }
+            },
+
+            // same concept applied to y property (vertical position)
+            y: {
+                value: {
+                    getEnd: function(target, key, value){
+                        return target.y + Phaser.Math.Between(-10, 10)
+                    }
+                }
+            }
+        },
+
+        // duration of the tween, in milliseconds
+        duration: 3000,
+
+        // how many times are we repeating the tween? -1 = repeat forever
+        repeat: -1,
+
+        // yoyo effect: execute the tween back and forth
+        yoyo: true
+    });
+}</code></pre>
+<p>A lot of stuff here, and one of the most complex tweens you may find.</p>
+<p>The first part of the script is quite easy: we simply place cloud images in two rows to create the two cloud layers.</p>
+<p>To give clouds a random effect, we use <code>Phaser.Math.Between</code> method.</p>
+<div class="alert alert-primary" role="alert">
+    <h3><code>Phaser.Math.Between(min, max)</code></h3>
+    <p>Computes a random integer between <code>min</code> and <code>max</code> values, inclusive.</p>
+    <p><code>min</code> and <code>max</code> must be integer.</p>
+</div>
+<p>Also keep in mind when you add a sprite taken from a sprite sheet, it's always rendered with its first frame.</p>
+<p>We use <code>setFrame</code> method to specify the frame we want to display.</p>
+<div class="alert alert-primary" role="alert">
+<h3><code>setFrame(n)</code></h3>
+<p>Sets the frame used by the Game Object to render.</p>
+<p>Frames start from zero.</p>
+</div>
+<p>Now, the most interesting part of the script: the tween.</p>
+<p>Here we tween all images stored in <code>cloudsArray</code> array, changing their <code>x</code> and <code>y</code> properties by a random number between -10 and 10.</p>
+<p>Tween is repeated forever, with a yoyo effect, going back and forth.</p>
+<div class="alert alert-primary" role="alert">
+    <h3><code>tweens.add(config)</code></h3>
+    <p>Creates and executes a tween with the options stored in <code>config</code> object.</p>
+    <ul>
+        <li><code>targets</code>: the array containing all targets affected by the tween.</li>
+        <li><code>props</code>: object with properties to be tweened.</li>
+        <li><code>duration</code>: duration of the tween, in milliseconds.</li>
+        <li><code>repeat</code>: the number of times to repeat the tween, set to <code>-1</code> to repeat forever</li>
+        <li><code>yoyo</code>: true if the tween once completed gets back to the starting tween values.</li>
+    </ul>
+</div>
+<p>The result, as you can see on the preview, is at the bottom of the game: two rows of clouds randomly moving.</p>
+<p>If you resize the game, the amount of circles uded varies to fill the entire game width.</p>
+</div>
+
+<div class = "coursepage" id = "coursepage04">
+<h1>Add and move randomly generated platforms</h1>
+<p>Platforms are used by the Irresponsible Ninja to move and make us score points.</p>
+<div class="alert alert-success" role="alert">
+    <ul>
+        <li><strong>What we want</strong>: randomly generated platforms, which room for customization, to appear in game; also, a danger zone which gives a bonus time.</li>
+        <li><strong>How we do it</strong>: platforms are sprites moved using tweens, and placing the danger zone is just a matter to know platforms bounds.</li>
+    </ul>
+</div>
+<p>Since we do not know platform width and height, we create them starting from a small tile which we scale accordingly, and same thing goes for the danger zone.</p>
+<p>This is the image saved in <code>assets/sprites/tile.png</code>:</p>
+<p><img src = "images/04/tile.png"></p>
+<p>And this the image saved in <code>assets/sprites/dangertile.png</code>:</p>
+<p><img src = "images/04/dangertile.png"></p>
+<p>Both are 32x32 pixels. We'll resize them at runtime.</p>
+<p>To add room for customization, we need to declare some more variables inside <code>gameOptions</code> object:</p>
+<pre data-line="8-21"><code class="language-javascript">let gameOptions = {
+    defaultSize: {
+        width: 750,
+        height: 1334,
+        maxRatio: 4 / 3
+    },
+
+    // array with the distance range between two platforms, in pixels
+    platformGapRange: [200, 400],
+
+    // array with the width range of each platform, in pixels
+    platformWidthRange: [50, 150],
+
+    // scrolling time, in milliseconds
+    scrollTime: 250,
+
+    // platform height, as a ratio from game height
+    platformHeight: 0.6,
+
+    // danger zone width, in pixels
+    dangerZoneWidth: 20
+}</code></pre>
+<p>New images have to be preloaded inside <code>preload</code> method of <code>preloadGame</code> class:</p>
+<pre data-line="3,4"><code class="language-javascript">preload(){
+    this.load.image("background", "assets/sprites/background.png");
+    this.load.image("tile", "assets/sprites/tile.png");
+    this.load.image("dangertile", "assets/sprites/dangertile.png");
+    this.load.spritesheet("cloud", "assets/sprites/cloud.png", {
+        frameWidth: 256,
+        frameHeight: 256
+    });
+}</code></pre>
+<p>Following the same concept to add clouds, now inside <code>create</code> method of <code>playGame</code> class we add two new methods: <code>addPlatforms</code> and <code>addDangerZone</code>.</p>
+<pre data-line="4,5"><code class="language-javascript">preload(){
+create(){
+    this.addBackground();
+    this.addPlatforms();
+    this.addDangerZone();
+    this.addClouds();
+}</code></pre>
+<p>You  may wonder why we did not add the new methods after <code>addClouds</code>.</p>
+<p>It's a matter of depth or Z-order.</p>
+<div class="alert alert-warning" role="alert">
+    <p>Although we are building a 2D game, where we are only allowed to place objects on coordinates based on x and y axis, there's something to say about Z-order.</p>
+    <p>In 2D environments objects can overlap, and when there are overlapping objects there is always one object which covers one or more objects.</p>
+    <p>Think about Photoshop layers. Top layers cover bottom layers. Or think about overlapping windows on your desktop, where top windows cover bottom windows.</p>
+    <p>It's obvious that even in 2D environments there must be some kind of depth: the Z-order.</p>
+    <p>When objects overlap, objects with a higher Z value hide part or all of objects with a lower Z value.</p>
+</div>
+<p>When we add sprites in Phaser, each new sprite added overlaps previously added sprites.</p>
+<p>That's what we want to add the backgroud, then the platforms over the background, then the danger zone over the platforms and finally the clouds over the danger zone.</p>
+<div class="alert alert-primary" role="alert">
+    <strong>Z-order</strong> is an ordering of overlapping two-dimensional objects, such as windows in a stacking window manager, or shapes in a graphics editor.
+</div>
+<p>Let's write <code>addPlatforms</code> method:</p>
+<pre><code class="language-javascript">addPlatforms(){
+
+    // main platform is platform zero...
+    this.mainPlatform = 0;
+
+    // ... of this array of two platforms created with addPlatform method.
+    // the argument is the x position
+    this.platforms = [
+        this.addPlatform((game.config.width - gameOptions.defaultSize.width) / 2),
+        this.addPlatform(game.config.width)
+    ];
+
+    // finally, another method to tween a platform
+    this.tweenPlatform();
+}</code></pre>
+<p>The concept behind the platforms is simple: we have one main platform, the one where the ninja stands, and the other platform which must be reached to continue playing.</p>
+<p>Platforms are stored in an array, and at the beginning of the game the main platform is the first one, at index zero.</p>
+<p>Main platform is placed on the left edge of the screen if we are in a perfect 9/16 resolution, or moved right by <code>(game.config.width - gameOptions.defaultSize.width) / 2</code> pixels if playing on a wider screen.</p>
+<p>Target platform at the beginning is on the right side of the screen.</p>
+<p>Let's see <code>addPlatform</code> method to add a single platform:</p>
+<pre><code class="language-javascript">addPlatform(posX){
+
+    // add the platform sprite according to posX and gameOptions.platformHeight
+    let platform = this.add.sprite(posX, game.config.height * gameOptions.platformHeight, "tile");
+
+    // platform width initially is the arithmetic average of gameOptions.platformWidthRange values
+    let width = (gameOptions.platformWidthRange[0] + gameOptions.platformWidthRange[1]) / 2;
+
+    // adjust platform display width
+    platform.displayWidth = width;
+
+    // height is determined by the distance from the platform and the bottom of the screen
+    // remember to add 50 more pixels for the shake effect
+    platform.displayHeight = game.config.height * (1 - gameOptions.platformHeight) + 50
+
+    // set platform origin to top left corner
+    platform.setOrigin(0, 0);
+
+    // return platform variable to be used by addPlatforms method
+    return platform
+}</code></pre>
+<p>Nothing new here, just a bit of math to determine width and height of the platform to be returned to <code>addPlatforms</code> method.</p>
+<div class="alert alert-primary" role="alert">
+    <h3><code>return</code></h3>
+    <p>Stops the execution of a function and returns a value from that function.</p>
+</div>
+<p>Now it's time to tween right platform to move close to left platform, with <code>tweenPlatform</code> method:</p>
+<pre><code class="language-javascript">tweenPlatform(){
+
+    // get the right coordinate of left platform
+    let rightBound = this.platforms[this.mainPlatform].getBounds().right;
+
+    let minGap = gameOptions.platformGapRange[0];
+    let maxGap = gameOptions.platformGapRange[1];
+
+    // determine the random gap between the platforms
+    let gap = Phaser.Math.Between(minGap, maxGap);
+
+    // right platform destination is determined by adding the right coordinate of the platform to the gap
+    let destination = rightBound + gap;
+    let minWidth = gameOptions.platformWidthRange[0];
+    let maxWidth = gameOptions.platformWidthRange[1];
+
+    // determine a random platform width
+    let width = Phaser.Math.Between(minWidth, maxWidth)
+
+    // adjust right platform width
+    this.platforms[1 - this.mainPlatform].displayWidth = width;
+
+    // tweening the right platform to destination
+    this.tweens.add({
+        targets: [this.platforms[1 - this.mainPlatform]],
+        x: destination,
+        duration: gameOptions.scrollTime,
+
+        // scope of the callback function
+        callbackScope: this,
+
+        // callback function once tween is complete
+        onComplete: function(){
+            this.placeDangerZone();
+        }
+    })
+}</code></pre>
+<p><code>tweenPlatform</code> determines a random platform width and the random distance between platforms, then tweens the platform to its destination.</p>
+<p>Once the tween has been completed, <code>placeDangerZone</code> method is called.</p>
+<p>How we can see when a tween is finished?</p>
+<div class="alert alert-primary" role="alert">
+    <h3><code>onComplete</code></h3>
+    <p>Function to be executed once the tween is completed</p>
+    <h3><code>callbackScope</code></h3>
+    <p>scope of <code>onComplete</code> callback function.</p>
+</div>
+<p>Also, knowing the exact bounds of each sprite in game has an important role when it's time to move objects and take decisions.</p>
+<div class="alert alert-primary" role="alert">
+    <h3><code>getBounds</code></h3>
+    <p>Gets the bounds of this Game Object, regardless of origin. The values are stored and returned in a Rectangle, or Rectangle-like, object.</p>
+    <p>Then you can access:</p>
+    <ul>
+        <li><code>bottom</code>: the sum of the <code>y</code> and <code>height</code> properties of the Rectangle.</li>
+        <li><code>centerX</code>: the <code>x</code> coordinate of the center of the Rectangle.</li>
+        <li><code>centerY</code>: the <code>y</code> coordinate of the center of the Rectangle.</li>
+        <li><code>height</code>: the height of the Rectangle.</li>
+        <li><code>left</code>: the <code>x</code> coordinate of the left of the Rectangle.</li>
+        <li><code>right</code>: the sum of the <code>x</code> and <code>width</code> properties of the Rectangle.</li>
+        <li><code>top</code>: the <code>y</code> coordinate of the top of the Rectangle.</li>
+        <li><code>width</code>: the width of the Rectangle.</li>
+        <li><code>x</code>: the <code>x</code> coordinate of the top left corner of the Rectangle.</li>
+        <li><code>y</code>: the <code>y</code> coordinate of the top left corner of the Rectangle.</li>
+    </ul>
+</div>
+<p><code>addDangerZone</code> and <code>placeDangerZone</code> methods respectively add the danger zone sprite to the game and place it on the left or right edge of the destination platform.</p>
+<p>Landing on the danger zone grants a bonus, but at the moment we just focus on adding it.</p>
+<p>Look at <code>addDangerZone</code> method:</p>
+<pre><code class="language-javascript">addDangerZone(){
+
+    // add danger zone sprite
+    this.dangerZone = this.add.sprite(0, this.platforms[this.mainPlatform].y, "dangertile");
+
+    // set danger zone registration point to top left corner
+    this.dangerZone.setOrigin(0, 0);
+
+    // adjust dangerzone width and height
+    this.dangerZone.displayWidth = gameOptions.dangerZoneWidth;
+    this.dangerZone.displayHeight = 10;
+
+    // set danger zone invisible
+    this.dangerZone.visible = false;
+}</code></pre>
+<p>Nothing new here, we just add and resize a sprite, but we do not show it at the moment.</p>
+<div class="alert alert-primary" role="alert">
+    <h3><code>visible</code></h3>
+    <p>Sets visible state of the sprite. Non-visible sprites are not rendered.</p>
+</div>
+<p><code>placeDangerZone</code> method places the danger zone on the left or right edge of the platform.</p>
+<pre><code class="language-javascript">placeDangerZone(){
+
+    // show danger zone
+    this.dangerZone.visible = true;
+
+    // determine right platform bound
+    let platformBound = this.platforms[1 - this.mainPlatform].getBounds().right;
+
+    // a random integer between 0 and 1 means 50% probability to place the
+    // danger zone on the left or right edge
+    if(Phaser.Math.Between(0, 1) == 0){
+
+        // left edge
+        this.dangerZone.x = this.platforms[1 - this.mainPlatform].x;
+    }
+    else{
+
+        // right edge
+        this.dangerZone.x = platformBound - gameOptions.dangerZoneWidth;
+    }
+}</code></pre>
+<p>And we now have two platforms with the danger zone.</p>
+<p>Resize the game to see left platform on the left edge of the game or a bit more centered according to screen width.</p>
+</div>
+
+<div class = "coursepage" id = "coursepage05">
+<h1>Add the pole and handle user input</h1>
+<p>The pole is used by the ninja to move from one platform to another</p>
+<div class="alert alert-success" role="alert">
+    <ul>
+        <li><strong>What we want</strong>: a pole growing as we tap and hold the screen, and falling when we release it.</li>
+        <li><strong>How we do it</strong>: the pole is a sprite moved and resized using a tween, which we control handling user input.</li>
+    </ul>
+</div>
+<p>Ninja pole has also room for customization, so we are going to add some new values in <code>gameOptions</code> global variable:</p>
+<pre data-line="13-20"><code class="language-javascript">let gameOptions = {
+    defaultSize: {
+        width: 750,
+        height: 1334,
+        maxRatio: 4 / 3
+    },
+    platformGapRange: [200, 400],
+    platformWidthRange: [50, 150],
+    scrollTime: 250,
+    platformHeight: 0.6,
+    dangerZoneWidth: 20,
+
+    // width of the pole, in pixels
+    poleWidth: 8,
+
+    // time to make pole reach its full length, in milliseconds
+    poleGrowTime: 400,
+
+    // time to make the pole rotate once released, in milliseconds
+    poleRotateTime: 500
+}</code></pre>
+<p>Pole is added to the game with a custom method, and we also need to handle player input, so we are going to add these lines to <code>create</code> method in <code>playGame</code> class:</p>
+<pre data-line="6-7,10-12"><code class="language-javascript">create(){
+    this.addBackground();
+    this.addPlatforms();
+    this.addDangerZone();
+
+    // method to add the pole
+    this.addPole();
+    this.addClouds();
+
+    // input management
+    this.input.on("pointerdown", this.handlePointerDown, this);
+    this.input.on("pointerup", this.handlePointerUp, this);
+}</code></pre>
+<p><code>addPole</code> method is added right before <code>addClouds</code> because we want clouds to cover the pole, if overlapping.</p>
+<div class="alert alert-primary" role="alert">
+    <h3><code>input.on("pointerdown", callback, context)</code></h3>
+    <p>executes <code>callback</code> function in <code>context</code> scope when a pointer – mouse pointer or finger – is pressed.</p>
+    <h3><code>input.on("pointerup", callback, context)</code></h3>
+    <p>executes <code>callback</code> function in <code>context</code> scope when a pointer – mouse pointer or finger – is released.</p>
+</div>
+<p>Adding the pole is easy. We are going to use the same image used for the platforms, in <code>addPole</code> method:</p>
+<pre><code class="language-javascript">addPole(){
+
+    // get left platform bounds
+    let bounds = this.platforms[this.mainPlatform].getBounds();
+
+    // add the pole close to the right edge of the left platform
+    this.pole = this.add.sprite(bounds.right - gameOptions.poleWidth, bounds.top, "tile");
+
+    // set pole anchor point to bottom right
+    this.pole.setOrigin(1, 1);
+
+    // adjust pole size. The pole starts very short.
+    this.pole.displayWidth = gameOptions.poleWidth;
+    this.pole.displayHeight = gameOptions.poleWidth;
+}</code></pre>
+<p>Once the pole has been added to the game, <code>handlePointerDown</code> method makes it grow:</p>
+<pre><code class="language-javascript">handlePointerDown(){
+
+    // we have to set a max width. Maximum platform distance + maximum platform width should be enough
+    let maxPoleWidth = gameOptions.platformGapRange[1] + gameOptions.platformWidthRange[1];
+
+    // a simple tween, much simpler than the one used to animate clouds
+    this.growTween = this.tweens.add({
+        targets: [this.pole],
+
+        // we tween display height. We also add 50 extra pixels
+        displayHeight: maxPoleWidth + 50,
+        duration: gameOptions.poleGrowTime
+    });
+}</code></pre>
+<p>We are using a tween to make the pole grow. This is much simpler than the tween used to animate the clouds because there is no yoyo effect, it's played only once and we act only on a single property, <code>displayHeight</code>.</p>
+<p>When the player releases the mouse or the finger, <code>growTween</code> tween must stop and another tween has to be created to make the pole fall.</p>
+<p><code>handlePointerUp</code>, called when the player releases the pointer, takes care of it:</p>
+<pre><code class="language-javascript">handlePointerUp(){
+
+    // stop grow tween
+    this.growTween.stop();
+
+    // add a tween to make the pole rotate by 90 degrees.
+    this.tweens.add({
+        targets: [this.pole],
+
+        // this is how we tween sprite rotation
+        angle: 90,
+        duration: gameOptions.poleRotateTime,
+
+        // tween easing
+        ease: "Bounce.easeOut"
+    })
+}</code></pre>
+<p><code>handlePointerUp</code> first stops <code>growTween</code>, if playing.</p>
+<div class="alert alert-primary" role="alert">
+    <h3><code>stop</code></h3>
+    <p>Stops the Tween immediately, whatever stage of progress it is.</p>
+</div>
+<p>Then, a new tween is executed on the pole, rotating it by 90 degrees, acting on its <code>angle</code> property.</p>
+<div class="alert alert-primary" role="alert">
+    <h3><code>angle</code></h3>
+    <p>Property to set the angle of the Game Object, in degrees, where <code>0</code> is to the right, <code>90</code> is down, <code>180</code> is left.</p>
+</div>
+<p>A new feature we can add to the tween is the ease function it uses. We wanted the pole to bounce to give some kind of realistic effect.</p>
+<div class="alert alert-primary" role="alert">
+    <h3><code>ease</code></h3>
+    <p>Property to set the ease function of a tween.</p>
+    <p>You can choose among <code>Back</code>, <code>Bounce</code>, <code>Circular</code>, <code>Cubic</code>, <code>Elastic</code>, <code>Expo</code>, <code>Linear</code>, <code>Quadratic</code>, <code>Quartic</code>, <code>Quintic</code>, <code>Sine</code>, <code>Stepped</code>.</p>
+</div>
+<p>If you test the game, you will be able to make the pole grow by pressing and holding the pointer, then to make it fall with a bounce effect once you release it.</p>
+<p>You can do it correctly only once, however.</p>
+<p>Then, strange things occur, such as the pole which keeps growing while already on the ground.</p>
+<p>This happens because the game is still incomplete, but we'll add some more controls later on.</p>
+</div>
+
+<div class = "coursepage" id = "coursepage06">
+<h1>Add and animate the ninja</h1>
+<p>You won't believe Irresponsible Ninja game features a ninja.</p>
+<div class="alert alert-success" role="alert">
+    <ul>
+        <li><strong>What we want</strong>: an animated ninja running along the pole.</li>
+        <li><strong>How we do it</strong>: ninja animation is just a spritesheet with all ninja frames to be played according to ninja actions.</li>
+    </ul>
+</div>
+<p>We are going to use a sprite sheet with all ninja animations.</p>
+<p>Each frame in the sprite sheet represents a frame of an animation.</p>
+<p>We want two animations: an idle animation, when the ninja is waiting, and a running animation when the ninja is moving.</p>
+<p>This is the 462x388 image made by 6x4 frames 77x97 pixel each, saved as <code>assets/sprites/hero.png</code>.</p>
+<p>Green background has been added to show you the transparency:</p>
+<p><img src = "images/06/hero.png"></p>
+<p>First 12 frames - frames 0 to 11 - represent idle animation, and frames 12 to 19 represent running animation.</p>
+<p>We need one more custom variable to <code>gameOptions</code> global object:</p>
+<pre data-line="16-17"><code class="language-javascript">let gameOptions = {
+    defaultSize: {
+        width: 750,
+        height: 1334,
+        maxRatio: 4 / 3
+    },
+    platformGapRange: [200, 400],
+    platformWidthRange: [50, 150],
+    scrollTime: 250,
+    platformHeight: 0.6,
+    dangerZoneWidth: 20,
+    poleWidth: 8,
+    poleGrowTime: 400,
+    poleRotateTime: 500,
+
+    // milliseconds needed to move the ninja by a pixel
+    heroWalkTime: 2
+}</code></pre>
+<p>Now we need to load the sprite sheet, exactly the same way we did with the clouds:</p>
+<pre data-line="9-12"><code class="language-javascript">preload(){
+    this.load.image("background", "assets/sprites/background.png");
+    this.load.image("tile", "assets/sprites/tile.png");
+    this.load.image("dangertile", "assets/sprites/dangertile.png");
+    this.load.spritesheet("cloud", "assets/sprites/cloud.png", {
+        frameWidth: 256,
+        frameHeight: 256
+    });
+    this.load.spritesheet("hero", "assets/sprites/hero.png", {
+        frameWidth: 77,
+        frameHeight: 97
+    })
+}</code></pre>
+<p>In <code>create</code> method of <code>preloadGame</code> class we define animations:</p>
+<pre data-line="3-31"><code class="language-javascript">create(){
+
+    // create an animation
+    this.anims.create({
+
+        // we refer to this animation with "idle" key
+        key: "idle",
+
+        // frames of the sprite sheet to use
+        frames: this.anims.generateFrameNumbers("hero", {
+            start: 0,
+            end: 11
+        }),
+
+        // frame rate, in frames per second
+        frameRate: 15,
+
+        // animation is be repeated endlessly
+        repeat: -1
+    });
+
+    // same concept is applied to run animation
+    this.anims.create({
+        key: "run",
+        frames: this.anims.generateFrameNumbers("hero", {
+            start: 12,
+            end: 19
+        }),
+        frameRate: 15,
+        repeat: -1
+    });
+    this.scene.start("PlayGame");
+}</code></pre>
+<p>Two animations have been created, one called <code>idle</code> and one called <code>run</code>.</p>
+<div class="alert alert-primary" role="alert">
+    <h3><code>anims.create(object)</code></h3>
+    <p>Defines an animation with <code>object</code> properties, including:</p>
+    <ul>
+        <li><code>key</code>: the key we use to refer to the animation.</li>
+        <li><code>frames</code>: an object containing data used to generate the frames for the animation.</li>
+        <li><code>frameRate</code>: the frame rate of playback in frames per second.</li>
+        <li><code>repeat</code>: number of times to repeat the animation, use <code>-1</code> for endless loop.</li>
+    </ul>
+    <h3><code>anims.generateFrameNumbers(key, config)</code></h3>
+    <p>Generates an array of animation frame objects from <code>key</code> texture key and <code>config</code> and configuration object.</p>
+</div>
+<p>Animations have been created and we are done with <code>preloadGame</code> class, so we move on to <code>playGame</code> class in <code>create</code> method with the new method to add the ninja to the game.</p>
+<pre data-line="7-8"><code class="language-javascript">create(){
+   this.addBackground();
+   this.addPlatforms();
+   this.addDangerZone();
+   this.addPole();
+
+   // new method to add the ninja
+   this.addPlayer();
+   this.addClouds();
+   this.input.on("pointerdown", this.handlePointerDown, this);
+   this.input.on("pointerup", this.handlePointerUp, this);
+}</code></pre>
+<p>Let's have a look at <code>addPlayer</code> method, which just adds the ninja in the same way we added the pole, but this time we also need to play an animation:</p>
+<pre><code class="language-javascript">addPlayer(){
+
+    // get bounds of main platforms
+    let platformBounds = this.platforms[this.mainPlatform].getBounds();
+
+    // determine horizontal hero position subtracting pole width from right main platform bound
+    let heroPosX = platformBounds.right - gameOptions.poleWidth;
+
+    // vertical hero position is the same as top bound of main platform
+    let heroPosY = platformBounds.top;
+
+    // add hero sprite
+    this.hero = this.add.sprite(heroPosX, heroPosY, "hero");
+
+    // set hero registration point to right bottom corner
+    this.hero.setOrigin(1, 1);
+
+    // play "idle" animation
+    this.hero.anims.play("idle");
+}</code></pre>
+<p>Now you should be used to add sprites on the screen, get their bounds and set their anchor points, so the only new feature here is the way we play an animation.</p>
+<div class="alert alert-primary" role="alert">
+    <h3><code>anims.play(key)</code></h3>
+    <p>Plays animation defined with <code>key</code> key.</p>
+</div>
+<p>When should we move the ninja? Once the pole fell down. We need to add a couple of lines to <code>handlePointerUp</code> method:</p>
+<pre data-line="9-14"><code class="language-javascript">handlePointerUp(){
+    this.growTween.stop();
+    this.tweens.add({
+        targets: [this.pole],
+        angle: 90,
+        duration: gameOptions.poleRotateTime,
+        ease: "Bounce.easeOut",
+
+        // once the tween which rotates the pole has been completed,
+        // call moveHero method
+        callbackScope: this,
+        onComplete: function(){
+            this.moveHero();
+        }
+    })
+}</code></pre>
+<p>We already know how to check for a tween to finish, this time at the end of the tween which rotates the pole we execute <code>moveHero</code> method:</p>
+<pre><code class="language-javascript">moveHero(){
+
+    // play "run" animation
+    this.hero.anims.play("run");
+
+    // tween the hero until the end of the pole
+    this.walkTween = this.tweens.add({
+        targets: [this.hero],
+        x: this.pole.getBounds().right,
+        duration: gameOptions.heroWalkTime * this.pole.displayHeight
+    });
+}</code></pre>
+<p>We just changed animation and moved the ninja to the right bound of the pole with a tween.</p>
+<p>You can see the result on the right, hold and release to make the pole grow, fall and then the ninja run to the end of the pole.</p>
+<p>We added a new feature, but also a lot of problems: first, the game works correctly only once.</p>
+<p>Then, the ninja never stops playing <code>run</code> animation.</p>
+<p>Moreover, nothing happens once the ninja reaches the end of the pole.</p>
+<p>Was the pole too short? Too long? Just perfect?</p>
+<p>There is still a lot of work to do, but we can say most of the hard concepts have already been explained.</p>
+</div>
+
+<div class = "coursepage" id = "coursepage07">
+<h1>Check for successul landings</h1>
+<p>Each ninja move can lead to three possible scenarios: platform too short, platform too long and successful landing.</p>
+<div class="alert alert-success" role="alert">
+    <ul>
+        <li><strong>What we want</strong>: check if landing was successful.</li>
+        <li><strong>How we do it</strong>: it's just a matter of checking pole and platform bounds.</li>
+    </ul>
+</div>
+<p>The first thing to do is define these three conditions in a way they are easy to manage.</p>
+<pre data-line="18-20"><code class="language-javascript">let game;
+let gameOptions = {
+    defaultSize: {
+        width: 750,
+        height: 1334,
+        maxRatio: 4 / 3
+    },
+    platformGapRange: [200, 400],
+    platformWidthRange: [50, 150],
+    scrollTime: 250,
+    platformHeight: 0.6,
+    dangerZoneWidth: 20,
+    poleWidth: 8,
+    poleGrowTime: 400,
+    poleRotateTime: 500,
+    heroWalkTime: 2
+}
+const POLE_SUCCESSFUL = 0;
+const POLE_TOO_SHORT = 1;
+const POLE_TOO_LONG = 2; </code></pre>
+<p>We define with zero a successful landing, with 1 a pole too short and with 2 a pole too long.</p>
+<p>But rather than using plain numbers, we assign these values to constants, because it's way more readable to check if a move is <code>POLE_SUCCESSFUL</code> rather than if a move is zero.</p>
+<div class="alert alert-primary" role="alert">
+    <h3><code>const</code></h3>
+    <p>A JavaScript constant is a variable that never changes and is declared with <code>const</code> keyword.</p>
+    <p>Trying to modify a constant value throws an error.</p>
+</div>
+<p>Where do we use these values? in <code>handlePointerUp</code> method:</p>
+<pre data-line="11-37"><code class="language-javascript">handlePointerUp(){
+    this.growTween.stop();
+    this.tweens.add({
+        targets: [this.pole],
+        angle: 90,
+        duration: gameOptions.poleRotateTime,
+        ease: "Bounce.easeOut",
+        callbackScope: this,
+        onComplete: function(){
+
+            // get pole bounds
+            let poleBounds = this.pole.getBounds();
+
+            // get right platform bounds
+            let platformBounds = this.platforms[1 - this.mainPlatform].getBounds();
+
+            // we assume the landing was successful, but...
+            let poleStatus = POLE_SUCCESSFUL;
+
+            // if the right bound of the pole is less than left bound of the platform...
+            if(poleBounds.right < platformBounds.left){
+
+                // the pole was too short
+                poleStatus = POLE_TOO_SHORT;
+            }
+            else{
+
+                // if the right bound of the pole is greater than right bound of the platform...
+                if(poleBounds.right > platformBounds.right){
+
+                    // the pole was too long
+                    poleStatus = POLE_TOO_LONG;
+                }
+            }
+
+            // poleStatus is passed to moveHero method as argument
+            this.moveHero(poleStatus);
+        }
+    })
+}</code></pre>
+<p>As said, it's just a matter to check platform and pole bounds.</p>
+<p>Let's see what to do with <code>poleStatus</code> argument passed to <code>moveHero</code> method:</p>
+<pre data-line="1-31,36-37"><code class="language-javascript">moveHero(poleStatus){
+
+    // get hero, pole and right platform bounds
+    let platformBounds = this.platforms[1 - this.mainPlatform].getBounds();
+    let heroBounds = this.hero.getBounds();
+    let poleBounds = this.pole.getBounds();
+
+    // heroDestination stores hero's final horizontal position
+    let heroDestination;
+
+    // checking various values:
+    switch(poleStatus){
+        case POLE_SUCCESSFUL:
+
+            // successful: the ninja moves until the end of the right platform, leaving some space
+            // for the pole to be used in next move
+            heroDestination = platformBounds.right - gameOptions.poleWidth;
+            break;
+        case POLE_TOO_SHORT:
+
+            // pole too short: the ninja moves until the end of the pole
+            // ninja's feet are still on the pole
+            heroDestination = poleBounds.right;
+            break;
+        case POLE_TOO_LONG:
+
+            // pole too long: the ninja moves until a bit more than the end of the pole.
+            // ninja's feet are in mid air
+            heroDestination = poleBounds.right + heroBounds.width / 2;
+            break;
+    }
+    this.hero.anims.play("run");
+    this.walkTween = this.tweens.add({
+        targets: [this.hero],
+
+        // tweening the ninja to heroDestination
+        x: heroDestination,
+        duration: gameOptions.heroWalkTime * this.pole.displayHeight
+    });
+}</code></pre>
+<p>According to <code>poleStatus</code> value, <code>heroDestination</code> value varies and the ninja stops in different places.</p>
+<div class="alert alert-primary" role="alert">
+    <h3><code>switch</code></h3>
+    <p><code>switch</code> statement executes a block of code depending on different cases.</p>
+    <p><pre><code>switch(expression) {
+    case 1:
+        // code block
+        break;
+    case 2:
+        // code block
+        break;
+    // case 3, 4, and so on
+}</code></pre></p>
+    <p><code>expression</code> is compared with the values of each case.</p>
+    <p>If there is a match, the associated block of code is executed.</p>
+    <h3><code>break</code></h3>
+    <p>breaks out of the switch block and stops the execution of more execution of code and case testing inside the block.</p>
+    <p>If <code>break</code> is omitted, the next code block in the <code>switch</code> statement is executed.</p>
+</div>
+<p>You can try by yourself in the example: try to land on the platform, to create a pole which is too short or too long and see what happens.</p>
+<p>We still have the problem it works correctly only the first time, but we are going to fix it.</p>
+<p>Same thing goes for ninja animation.</p>
+</div>
+
+<div class = "coursepage" id = "coursepage08">
+<h1>Make the ninja die when the pole is too short</h1>
+<p>We start managing the first of the three possible cases: the pole is too short and the poor ninja falls down and die.</p>
+<div class="alert alert-success" role="alert">
+    <ul>
+        <li><strong>What we want</strong>: animate both the ninja and the platform falling down.</li>
+        <li><strong>How we do it</strong>: we just need anoter couple of tweens.</li>
+    </ul>
+</div>
+<p>To add more customization to the game, we store in <code>gameOptions</code> global object a new value:</p>
+<pre data-line="17-18"><code class="language-javascript">let gameOptions = {
+    defaultSize: {
+        width: 750,
+        height: 1334,
+        maxRatio: 4 / 3
+    },
+    platformGapRange: [200, 400],
+    platformWidthRange: [50, 150],
+    scrollTime: 250,
+    platformHeight: 0.6,
+    dangerZoneWidth: 20,
+    poleWidth: 8,
+    poleGrowTime: 400,
+    poleRotateTime: 500,
+    heroWalkTime: 2,
+
+    // time needed for the ninja to fall down, in milliseconds
+    heroFallTime: 500
+}</code></pre>
+<p>Once the ninja reaches the end of the pole, we want the pole to collapse and the ninja to fall down.</p>
+<p>We have to add some lines to <code>moveHero</code> method, to be executed at the end of the tween which makes the ninja walk.</p>
+<pre data-line="23-36"><code class="language-javascript">moveHero(poleStatus){
+    let platformBounds = this.platforms[1 - this.mainPlatform].getBounds();
+    let heroBounds = this.hero.getBounds();
+    let poleBounds = this.pole.getBounds();
+    let heroDestination;
+    switch(poleStatus){
+        case POLE_SUCCESSFUL:
+            heroDestination = platformBounds.right - gameOptions.poleWidth;
+            break;
+        case POLE_TOO_SHORT:
+            heroDestination = poleBounds.right;
+            break;
+        case POLE_TOO_LONG:
+            heroDestination = poleBounds.right + heroBounds.width / 2;
+            break;
+    }
+    this.hero.anims.play("run");
+    this.walkTween = this.tweens.add({
+        targets: [this.hero],
+        x: heroDestination,
+        duration: gameOptions.heroWalkTime * this.pole.displayHeight,
+
+        // define scope and function to execute onche the tween is complete
+        callbackScope: this,
+        onComplete: function(){
+
+            // checking polestatus values, we'll add more later
+            switch(poleStatus){
+                case POLE_TOO_SHORT:
+
+                    // pole too short: execute poleFallDown and fallAndDie methods
+                    this.poleFallDown();
+                    this.fallAndDie();
+                    break;
+            }
+        }
+    });
+}</code></pre>
+<p>Just a simple listener and two new methods to call, so let's start with <code>poleFallDown</code> method:</p>
+<pre><code class="language-javascript">poleFallDown(){
+
+// tween to make pole fall under ninja's feet
+this.tweens.add({
+
+    // the pole is the target of this tween
+    targets: [this.pole],
+
+    // pole is being rotated by 180 degrees
+    angle: 180,
+
+    // tween duration: poleRotateTime milliseconds
+    duration: gameOptions.poleRotateTime,
+
+    // tween easing function
+    ease: "Cubic.easeIn"
+})</code></pre>
+<p>We rotate the pole by 180 degrees, the result is dramatic as it seems the pole is collapsing.</p>
+<p>Obviously the ninja falls down with the pole, with the proper tween in <code>fallAndDie</code> method:</p>
+<pre><code class="language-javascript">fallAndDie(){
+
+    // tween to make ninja fall down
+    this.tweens.add({
+
+        // the ninja is the target of this tween
+        targets: [this.hero],
+
+        // the ninja falls down off the bottom of the screen
+        y: game.config.height + this.hero.displayHeight * 2,
+
+        // ninja also rotates by 180 degrees
+        angle: 180,
+
+        // tween duration: heroFallTime mmilliseconds
+        duration: gameOptions.heroFallTime,
+
+        // tween easing function
+        ease: "Cubic.easeIn"
+    })
+}</code></pre>
+<p>We don't just rotate the ninja, we also change <code>y</code> property to make ninja fall down behind the clouds. Bye bye ninja.</p>
+<p>Test the example on the right, when the pole is too short, the pole collapses and the ninja falls down.</p>
+<p>Only once, of course, because the main problem remains. Never mind.</p>
+</div>
+
+<div class = "coursepage" id = "coursepage09">
+<h1>Make the ninja die when the pole is too long</h1>
+<p>Bad luck for the ninja even if the pole is too long.</p>
+<div class="alert alert-success" role="alert">
+    <ul>
+        <li><strong>What we want</strong>: animate the ninja falling down the platform.</li>
+        <li><strong>How we do it</strong>: we use tweens to animate the ninja.</li>
+    </ul>
+</div>
+<p>When the platform is too long, the ninja falls down but the platform does not collapse like in previous case.</p>
+<p>Rather than just calling the same tween used before to make the ninja fall down, we'll also add a couple of features to the game like a camera shake when the ninja smacks the ground and we'll adjust ninja y position when running over the pole, as at the moment the ninja overlaps the pole rather than running over it.</p>
+<p>Some new lines to add to <code>moveHero</code> method:</p>
+<pre data-line="30-33,37-60"><code class="language-javascript">moveHero(poleStatus){
+    let platformBounds = this.platforms[1 - this.mainPlatform].getBounds();
+    let heroBounds = this.hero.getBounds();
+    let poleBounds = this.pole.getBounds();
+    let heroDestination;
+    switch(poleStatus){
+        case POLE_SUCCESSFUL:
+            heroDestination = platformBounds.right - gameOptions.poleWidth;
+            break;
+        case POLE_TOO_SHORT:
+            heroDestination = poleBounds.right;
+            break;
+        case POLE_TOO_LONG:
+            heroDestination = poleBounds.right + heroBounds.width / 2;
+            break;
+    }
+    this.hero.anims.play("run");
+    this.walkTween = this.tweens.add({
+        targets: [this.hero],
+        x: heroDestination,
+        duration: gameOptions.heroWalkTime * this.pole.displayHeight,
+        callbackScope: this,
+        onComplete: function(){
+            switch(poleStatus){
+                case POLE_TOO_SHORT:
+                    this.poleFallDown();
+                    this.fallAndDie();
+                    break;
+
+                // when the pole is too long, we still call fallAndDie method
+                case POLE_TOO_LONG:
+                    this.fallAndDie();
+                    break;
+            }
+        },
+
+        // functon to be executed each frame the tween updates
+        onUpdate: function(){
+
+            // get ninja bounds
+            let heroBounds = this.hero.getBounds();
+
+            // get pole bounds
+            let poleBounds = this.pole.getBounds();
+
+            // get right platform bound
+            let platformBounds = this.platforms[1 - this.mainPlatform].getBounds();
+
+            // if the ninja is moving along the pole...
+            if(heroBounds.centerX > poleBounds.left && heroBounds.centerX &lt; poleBounds.right){
+
+                // ...then place the ninja over the pole
+                this.hero.y = poleBounds.top;
+            }
+            else{
+
+                // ... otherwise the ninja is placed over the platform
+                this.hero.y = platformBounds.top;
+            }
+        }
+    });
+}</code></pre>
+<p>If you compare this example with previous examples, you will notice this one moves the ninja in a more realistic way, because now the ninja is really running over the pole rather than moving overlapping it.</p>
+<div class="alert alert-primary" role="alert">
+    <h3><code>onUpdate</code></h3>
+    <p>Function to be executed each time the tween is updated.</p>
+    <p>You can expect to be executed each frame until the tween is completed.</p>
+</div>
+<p>We also want to add a <code>onComplete</code> callback to the tween in <code>fallAndDie</code> method:</p>
+<pre data-line="10-15"><code class="language-javascript">fallAndDie(){
+    this.tweens.add({
+        targets: [this.hero],
+        y: game.config.height + this.hero.displayHeight * 2,
+        angle: 180,
+        duration: gameOptions.heroFallTime,
+        ease: "Cubic.easeIn",
+        callbackScope: this,
+
+        // when the tween ends...
+        onComplete: function(){
+
+            // ... shake the camera
+            this.cameras.main.shake(200, 0.01);
+        }
+    })
+}</code></pre>
+<p>If you try the example, you'll see how the camera shake adds realism to the "fall and die" effect.</p>
+<p>And finally we can benefit of those extra pixels added to the background: without them, the background gradient would have revealed canvas background color.</p>
+<div class="alert alert-primary" role="alert">
+    <h3><code>shake(duration, intensity)</code></h3>
+    <p>Shakes the camera by the <code>intensity</code> intensity over <code>duration</code> milliseconds.</p>
+    <h3><code>cameras.main</code></h3>
+    <p>A handy reference to the main camera, the first camera the Camera Manager creates.</p>
+</div>
+<p>We still have the problem everything works well only the first time. Never mind.</p>
+</div>
+
+
+<div class = "coursepage" id = "coursepage10">
+<h1>Continue playing when the ninja lands successfully</h1>
+<p>Finally we are going to cover the most interesting case: the ninja lands successfully and you can continue playing.</p>
+<div class="alert alert-success" role="alert">
+    <ul>
+        <li><strong>What we want</strong>: bring the ninja on the right platform, then scroll the game and let next platform appear.</li>
+        <li><strong>How we do it</strong>: the game won't scroll. We only move platforms to give players the feeling it's an endless runner, but it's a fake effect.</li>
+    </ul>
+</div>
+<p>We are going to uncover the great endless runner swindle.</p>
+<div class="alert alert-warning" role="alert">
+    <p>In an endless runner game, you probably expect the main character to run across an environment, with the camera following player movements.</p>
+    <p>That's why it's called "endless runner"!</p>
+    <p>You're right. The ninja should run from platform to platform and the camera should follow the action.</p>
+    <p>But we are game developers, we sell dreams and we make tricks.</p>
+    <p>The ninja is moving only from left to right platform.</p>
+    <p>The camera is not moving.</p>
+    <p>Only the platforms - and other few things such as stuff to collect if any - are moving.</p>
+    <p>The result is we give the player the same feeling as if the ninja were jumping from platform to platform with the camera following the action, with far less effort.</p>
+    <p>This is how most endless runner games work.</p>
+    <p>Player does not run. Environment does.</p>
+</div>
+<p>Ready to go? Another change to <code>moveHero</code> method:</p>
+<pre data-line="33-38"><code class="language-javascript">moveHero(poleStatus){
+    let platformBounds = this.platforms[1 - this.mainPlatform].getBounds();
+    let heroBounds = this.hero.getBounds();
+    let poleBounds = this.pole.getBounds();
+    let heroDestination;
+    switch(poleStatus){
+        case POLE_SUCCESSFUL:
+            heroDestination = platformBounds.right - gameOptions.poleWidth;
+            break;
+        case POLE_TOO_SHORT:
+            heroDestination = poleBounds.right;
+            break;
+        case POLE_TOO_LONG:
+            heroDestination = poleBounds.right + heroBounds.width / 2;
+            break;
+    }
+    this.hero.anims.play("run");
+    this.walkTween = this.tweens.add({
+        targets: [this.hero],
+        x: heroDestination,
+        duration: gameOptions.heroWalkTime * this.pole.displayHeight,
+        callbackScope: this,
+        onComplete: function(){
+            switch(poleStatus){
+                case POLE_TOO_SHORT:
+                    this.poleFallDown();
+                    this.fallAndDie();
+                    break;
+                case POLE_TOO_LONG:
+                    this.fallAndDie();
+                    break;
+
+                // if it was a successful landing...
+                case POLE_SUCCESSFUL:
+
+                    // ...call nextPlatform method
+                    this.nextPlatform();
+                    break;
+            }
+        },
+        onUpdate: function(){
+            let heroBounds = this.hero.getBounds();
+            let poleBounds = this.pole.getBounds();
+            let platformBounds = this.platforms[1 - this.mainPlatform].getBounds();
+            if(heroBounds.centerX > poleBounds.left && heroBounds.centerX &lt; poleBounds.right){
+                this.hero.y = poleBounds.top;
+            }
+            else{
+                this.hero.y = platformBounds.top;
+            }
+        }
+    });
+}</code></pre>
+<p>What happens in <code>nextPlafrom</code> method?</p>
+<p>We fake camera movement, by moving actors instead.</p>
+<pre><code class="language-javascript">nextPlatform(){
+
+    // play idle animation
+    this.hero.anims.play("idle");
+
+    // place the ninja on top of the platform, if not already
+    this.hero.y = this.platforms[this.mainPlatform].getBounds().top;
+
+    // hide danger zone
+    this.dangerZone.visible = false;
+
+    // get right platform position
+    let rightPlatformPosition =  this.platforms[1 - this.mainPlatform].x
+
+    // determine distance between left and righ platforms
+    let distance = this.platforms[1 - this.mainPlatform].x - this.platforms[this.mainPlatform].x;
+
+    // tween to move  hero, pole and platforms
+    this.tweens.add({
+
+        // look how different game objects can be tweened as long as they are in targets array
+        targets: [this.hero, this.pole, this.platforms[0], this.platforms[1]],
+        props: {
+
+            // tween x property
+            x: {
+
+                // subtract distance from their x position
+                value: "-= " + distance
+            },
+
+            // tween alpha property. The transparency
+            alpha: {
+                value: {
+
+                    // look at this: alpha is tweened to zero only if horizontal position
+                    // of the target is less than right platform horizontal position.
+                    // This way, the right platform and the ninja aren't affected
+                    getEnd: function(target, key, value){
+                        if(target.x &lt; rightPlatformPosition){
+
+                            // alpha = 0: completely transparent
+                            return 0
+                        }
+
+                        // alpha = 1: completely opaque
+                        return 1
+                    }
+                }
+            }
+        },
+        duration: gameOptions.scrollTime,
+        callbackScope: this,
+        onComplete: function(){
+
+            // at the end of the tween, call prepareNextMove method
+            this.prepareNextMove();
+        }
+    })
+}</code></pre>
+<p>Moving everything to the left while keeping the camera fixed fakes the scrolling.</p>
+<div class="alert alert-warning" role="alert">
+    <p>Why are we turning some stuff to transparent? Can't we just move it outside the left side of the screen?</p>
+    <p>Yes, we could, but remember the screen can be wider than you think.</p>
+    <p>Scrolling and fading away both left platform and the pole prevents us to make calculations and looks nice anyway.</p>
+</div>
+<p>Once we are done with scrolling away stuff, it's time to prepare for next move.</p>
+<p>Look at <code>prepareNextMove</code> method:</p>
+<pre><code class="language-javascript">prepareNextMove(){
+
+    // left platform now is moved to the right of the screen
+    this.platforms[this.mainPlatform].x = game.config.width;
+
+    // set platform alpha to 1
+    this.platforms[this.mainPlatform].alpha = 1;
+
+    // setting mainPlatform from 0 to 1 - or from 1 to 0 - switches platforms array
+    // index for main platform
+    this.mainPlatform = 1 - this.mainPlatform;
+
+    // call tweenPlatform method to make the right platform - former left platform - enter the game
+    this.tweenPlatform();
+
+    // reset pole angle, alpha, position and height
+    this.pole.angle = 0;
+    this.pole.alpha = 1;
+    this.pole.x = this.platforms[this.mainPlatform].getBounds().right - gameOptions.poleWidth;
+    this.pole.displayHeight = gameOptions.poleWidth;
+}</code></pre>
+<p>At the end of <code>prepareNextMove</code> method we are ready to reach next platform, or die trying.</p>
+<p>Try to land on a platform and see what happens: unfortunately it's guaranteed to work only the first time, but we are going to fix this issue in next step.</p>
+<div class="alert alert-warning" role="alert">
+    <p>Why are moving platform from left to right? Wouldn't be better to destroy the platform outside the screen and create a brand new platform?</p>
+    <p>No, it wouldn't.</p>
+    <p>It might be easier, but it's not better because one of the golden rules in game development is recycle your resources.</p>
+    <p>Imagine the platform to be destroyed each time the ninja moves on to next platform.</p>
+    <p>A sprite is destroyed, and a new sprite - the new platform - is created.</p>
+    <p>This would happen a lot of times during the game, and although I am sure Phaser has a good memory management and garbage collection, this can be very resource-consuming in the long run.</p>
+    <p>That's why we are recycling everything.</p>
+</div>
+Time to get rid of all bugs.
+</div>
+
+<div class = "coursepage" id = "coursepage11">
+<h1>Handle game states</h1>
+<p>Do you know why in previous steps the game worked correcly only the first time?</p>
+<p>Because we did not specify any game state.</p>
+<p>No matter what the ninja is doing, you could give the game an input trying to extend the pole, even when you shouldn't.</p>
+<p>Sure, if you respect the rules, and wait for the ninja to cross the platform - or die trying - before firing another input, everything works fine.</p>
+<p>But players do not follow rules.</p>
+<p>It's not a matter of cheating, it's just they will probably do some actions when the game does not require them, most of times leading to weird results.</p>
+<p>So we have to define some game states.</p>
+<div class="alert alert-success" role="alert">
+    <ul>
+        <li><strong>What we want</strong>: limit player interaction when it's not necessary.</li>
+        <li><strong>How we do it</strong>: accept player input only under certain conditions.</li>
+    </ul>
+</div>
+<p>Players interact with the ninja in three ways:</p>
+<ol>
+    <li><strong>Waiting for player input start</strong>: when the ninja is on the left platform and waits for the player to make the pole grow.</li>
+    <li><strong>Waiting for player input end</strong>: when the pole is growing.</li>
+    <li><strong>No interaction at all</strong>: once the player releases the input, then it's time to sit and wait for the ninja to fail or succeed.</li>
+</ol>
+<p>We can code these three game states with numbers from 0 to 2, and we use constants to make the script more readable, just like we did with pole states.</p>
+<pre data-line="23-30"><code class="language-javascript">let game;
+let gameOptions = {
+    defaultSize: {
+        width: 750,
+        height: 1334,
+        maxRatio: 4 / 3
+    },
+    platformGapRange: [200, 400],
+    platformWidthRange: [50, 150],
+    scrollTime: 250,
+    platformHeight: 0.6,
+    dangerZoneWidth: 20,
+    poleWidth: 8,
+    poleGrowTime: 400,
+    poleRotateTime: 500,
+    heroWalkTime: 2,
+    heroFallTime: 500
+}
+const POLE_SUCCESSFUL = 0;
+const POLE_TOO_SHORT = 1;
+const POLE_TOO_LONG = 2;
+
+// idle state: the ninja is moving due to latest player action
+const IDLE = 0;
+
+// waiting for input start state: the game is waiting for player input
+const WAITING_FOR_INPUT_START = 1;
+
+// waiting for input stop state: the game is waiting for the player to release the input
+const WAITING_FOR_INPUT_STOP = 2;</code></pre>
+<p>At the beginning of the game, in <code>create</code> method, we are just waiting for player input.</p>
+<pre data-line="9-10"><code class="language-javascript">create(){
+    this.addBackground();
+    this.addPlatforms();
+    this.addDangerZone();
+    this.addPole();
+    this.addPlayer();
+    this.addClouds();
+
+    // let's wait for input start
+    this.gameMode = WAITING_FOR_INPUT_START;
+    this.input.on("pointerdown", this.handlePointerDown, this);
+    this.input.on("pointerup", this.handlePointerUp, this);
+}</code></pre>
+<p>What happens in <code>handlePointerDown</code> method? We process the input only if the state is <code>WAITING_FOR_INPUT_START</code>, then immediately switch to <code>WAITING_FOR_INPUT_STOP</code> as we wait for the player to release the input:</p>
+<pre data-line="3-4,6-7,14"><code class="language-javascript">handlePointerDown(){
+
+    // we only execute the code if gameMode is WAITING_FOR_INPUT_START
+    if(this.gameMode == WAITING_FOR_INPUT_START){
+
+        // then gameMode is set to WAITING_FOR_INPUT_STOP
+        this.gameMode = WAITING_FOR_INPUT_STOP;
+        let maxPoleWidth = gameOptions.platformGapRange[1] + gameOptions.platformWidthRange[1];
+        this.growTween = this.tweens.add({
+            targets: [this.pole],
+            displayHeight: maxPoleWidth + 50,
+            duration: gameOptions.poleGrowTime
+        });
+    }
+}</code></pre>
+<p>The same concept is applied to <code>handlePointerUp</code> method: we execute the code if the state is <code>WAITING_FOR_INPUT_STOP</code>, then immediately switch to <code>IDLE</code> as we watch the ninja fail or succeed.</p>
+<pre data-line="3-4,6-7,30"><code class="language-javascript">handlePointerUp(){
+
+    // we only execute the code if gameMode is WAITING_FOR_INPUT_STOP
+    if(this.gameMode == WAITING_FOR_INPUT_STOP){
+
+        // then gameMode is set to IDLE
+        this.gameMode = IDLE;
+        this.growTween.stop();
+        this.tweens.add({
+            targets: [this.pole],
+            angle: 90,
+            duration: gameOptions.poleRotateTime,
+            ease: "Bounce.easeOut",
+            callbackScope: this,
+            onComplete: function(){
+                let poleBounds = this.pole.getBounds();
+                let platformBounds = this.platforms[1 - this.mainPlatform].getBounds();
+                let poleStatus = POLE_SUCCESSFUL;
+                if(poleBounds.right < platformBounds.left){
+                    poleStatus = POLE_TOO_SHORT;
+                }
+                else{
+                    if(poleBounds.right > platformBounds.right){
+                        poleStatus = POLE_TOO_LONG;
+                    }
+                }
+                this.moveHero(poleStatus);
+            }
+        })
+    }
+}</code></pre>
+<p>Finally in <code>prepareNextMove</code> method we reset the input to <code>WAITING_FOR_INPUT_START</code>, since it's time for the player to move again.</p>
+<pre data-line="11-12"><code class="language-javascript">prepareNextMove(){
+    this.platforms[this.mainPlatform].x = game.config.width;
+    this.platforms[this.mainPlatform].alpha = 1;
+    this.mainPlatform = 1 - this.mainPlatform;
+    this.tweenPlatform();
+    this.pole.angle = 0;
+    this.pole.alpha = 1;
+    this.pole.x = this.platforms[this.mainPlatform].getBounds().right - gameOptions.poleWidth;
+    this.pole.displayHeight = gameOptions.poleWidth;
+
+    // reset gameMode to WAITING_FOR_INPUT_START
+    this.gameMode = WAITING_FOR_INPUT_START;
+}</code></pre>
+<p>Test the game now: no more issues and glitches due to wrong input management.</p>
+</div>
+
+<div class = "coursepage" id = "coursepage12">
+<h1>Add game title and play button</h1>
+<p>At this time the game is working well but it would feel rather incomplete without a title screen.</p>
+<p>This is what we are going to add now: a title screen with a "Play" button.</p>
+<div class="alert alert-success" role="alert">
+    <ul>
+        <li><strong>What we want</strong>: a title screen with a "Play" button</li>
+        <li><strong>How we do it</strong>: title screen is just a sprite; "Play" button is a sprite with interactivity.</li>
+    </ul>
+</div>
+<p>We need some more images: one for game title, one for "Play" button and we also add one for in-game instructions.</p>
+<p>This is the image saved as <code>assets/sprites/title.png</code>, green background has been added to show you the transparency.</p>
+<p><img src = "images/12/title.png"></p>
+<p>Game information is saved as <code>assets/sprites/info.png</code>, green background has been added to show you the transparency.</p>
+<p><img src = "images/12/info.png"></p>
+<p>Finally the play button: <code>assets/sprites/playbutton.png</code>, green background has been added to show you the transparency.</p>
+<p><img src = "images/12/playbutton.png"></p>
+<p>We start preloading images in <code>preload</code> method of <code>preloadGame</code> class:</p>
+<pre data-line="5-7"><code class="language-javascript">preload(){
+    this.load.image("background", "assets/sprites/background.png");
+    this.load.image("tile", "assets/sprites/tile.png");
+    this.load.image("dangertile", "assets/sprites/dangertile.png");
+    this.load.image("title", "assets/sprites/title.png");
+    this.load.image("info", "assets/sprites/info.png");
+    this.load.image("playbutton", "assets/sprites/playbutton.png");
+    this.load.spritesheet("cloud", "assets/sprites/cloud.png", {
+        frameWidth: 256,
+        frameHeight: 256
+    });
+    this.load.spritesheet("hero", "assets/sprites/hero.png", {
+        frameWidth: 77,
+        frameHeight: 97
+    })
+}</code></pre>
+<p>Moving on to <code>create</code> method in <code>playGame</code> class, now we start with the game mode</p>
+<pre data-line="9-10,12-13"><code class="language-javascript">create(){
+    this.addBackground();
+    this.addPlatforms();
+    this.addDangerZone();
+    this.addPole();
+    this.addPlayer();
+    this.addClouds();
+
+    // this method adds game title
+    this.addGameTitle();
+
+    // previously it was WAITING_FOR_INPUT_START
+    this.gameMode = IDLE;
+    this.input.on("pointerdown", this.handlePointerDown, this);
+    this.input.on("pointerup", this.handlePointerUp, this);
+}</code></pre>
+<p>We delegate to <code>addGameTitle</code> method the creation of game title and play button:</p>
+<pre><code class="language-javascript">addGameTitle(){
+
+    // guiGroup is the group which contains all GUI elements
+    this.guiGroup = this.add.group();
+
+    // a black overlay is added to cover the entire game area, in the same way
+    // we previously added the sky background gradient
+    let blackOverlay = this.add.sprite(0, 0, "tile");
+    blackOverlay.setOrigin(0, 0);
+    blackOverlay.displayWidth = game.config.width;
+    blackOverlay.displayHeight = game.config.height;
+    blackOverlay.alpha = 0.8;
+
+    // then the black overlay is added to guiGroup
+    this.guiGroup.add(blackOverlay);
+
+    // add the title
+    let title = this.add.sprite(game.config.width / 2, 50, "title");
+    title.setOrigin(0.5, 0);
+
+    // add the title to guiGroup
+    this.guiGroup.add(title);
+
+    // add play button
+    let playButtonX = game.config.width / 2;
+    let playButtonY = game.config.height / 2 - 20;
+    let playButton = this.add.sprite(playButtonX, playButtonY, "playbutton");
+
+    // set play button interactive, so it triggers input
+    playButton.setInteractive();
+
+    // callback function to execute when the button is released
+    playButton.on("pointerup", function(){
+
+        // make the entire guiGroup invisible
+        this.guiGroup.toggleVisible();
+
+        // make the entire group inactive
+        this.guiGroup.active = false;
+
+        // make the camera flash
+        this.cameras.main.flash();
+
+        // call addGameInfo method
+        this.addGameInfo();
+    }, this);
+
+    // the button too is added to guiGroup
+    this.guiGroup.add(playButton);
+
+    // then the button is animated with a yoyo tween
+    this.tweens.add({
+        targets: [playButton],
+        y: game.config.height / 2 + 20,
+        duration: 5000,
+        yoyo: true,
+        repeat: -1
+    })
+}</code></pre>
+<p>We have a couple of new concepts to cover.</p>
+<p>Black overlay image, game title and "play" button belong to the same group of sprites we used to build the title screen.</p>
+<p>That's why they have been placed in a group.</p>
+<p>Now we know all sprites inside <code>guiGroup</code> belong to game title.</p>
+<div class="alert alert-primary" role="alert">
+    <h3><code>add.Group()</code></h3>
+    <p>Crates a Group.</p>
+    <p>A Group is a way for you to create, manipulate, or recycle similar Game Objects.</p>
+    <p>Group membership is non-exclusive. A Game Object can belong to several groups, one group, or none.</p>
+    <p>Groups themselves aren't displayable, and can't be positioned, rotated, scaled, or hidden.</p>
+    <h3><code>add(child)</code></h3>
+    <p>Adds <code>child</code> Game Object to a group.</p>
+</div>
+<p>So at the moment it's just a matter of adding sprites to the scene and adding them to <code>guiGroup</code> group.</p>
+<p>Is there any reason to use the group, other than keeping Game Objects organized? Thes, there is, and we are about to discover it.</p>
+<p>Before we proceed, push "Play" button: game starts.</p>
+<p>"Play" button is just a sprite we made interactive, so we can fire callback functions when the player interacts with it.</p>
+<div class="alert alert-primary" role="alert">
+    <h3><code>setInteractive()</code></h3>
+    <p>Enables the Game Object for input.</p>
+</div>
+<p>Once a Game Object is enabled for input, we can fire a callback function for its <code>pointerup</code> event.</p>
+<p>Pressing "Play" button makes background, "Play" button itself and game title disappear.</p>
+<p>This is when <code>guiGroup</code> comes into play by toggling its members <code>visible</code> state.</p>
+<div class="alert alert-primary" role="alert">
+    <h3><code>toggleVisible()</code></h3>
+    <p>Toggles (flips) the visible state of each member of this group.</p>
+</div>
+<p>With all <code>guiGroup</code> members invisible, there is no need for us to tell Phaser to take care of them, so we disable <code>guiGroup</code>.</p>
+<div class="alert alert-primary" role="alert">
+    <h3><code>active</code></h3>
+    <p>Property which defines if Group members should be updated at each frame.</p>
+</div>
+<p>Flashing the camera adds an eye-candy effect and acts as a sort of transition between game title and the game itself.</p>
+<div class="alert alert-primary" role="alert">
+    <h3><code>flash</code></h3>
+    <p>Flashes the camera.</p>
+</div>
+<p><code>addGameInfo</code> method shows how to play and enters in <code>WAITING_FOR_INPUT_START</code> game state.</p>
+<pre><code class="language-javascript">addGameInfo(){
+    this.info = this.add.sprite(game.config.width / 2, game.config.height / 4, "info");
+    this.gameMode = WAITING_FOR_INPUT_START;
+}</code></pre>
+<p>Now we have both the game title and the instructions how to play.</p>
+</div>
+
+
+<div class = "coursepage" id = "coursepage13">
+<h1>Add game over screen</h1>
+<p>Players like polished and complete games, featuring title screen and game over screen.</p>
+<p>Game over screen needs tofeature a "restart" button, a "main menu" button and a button with developer logo.</p>
+<div class="alert alert-success" role="alert">
+    <ul>
+        <li><strong>What we want</strong>: a game over screen with three buttons.</li>
+        <li><strong>How we do it</strong>: just some more buttons to add to the game.</li>
+    </ul>
+</div>
+<p>We need two more images to the game:</p>
+<p>This is the image saved as <code>assets/sprites/icons.png</code>, green background has been added to show you the transparency.</p>
+<p><img src = "images/13/icons.png"></p>
+<p>It's used as a sprite sheet with four buttons:</p>
+<ul>
+    <li>"Play" button, to make you play instantly.</li>
+    <li>"Home" button, to bring you back to game title.</li>
+    <li>"Sound on" button to enable sound.</li>
+    <li>Sound off" button to disable sound.</li>
+</ul>
+<p>During this step we only work with "Play" and "Home" buttons, anyway we'll also give player the option to turn sound on and off.</p>
+<div class="alert alert-warning" role="alert">
+    <p>Before we start coding, you should consider some hyper casual game publishers do not even want your game to have a splash screen or a game title screen, mainly because your game will be part of a collection which already includes a game title screen.</p>
+    <p>Be prepared to add or remove title screen in just one line of code.</p>
+</div>
+<p>So we are going to add another variable to <code>gameOptions</code> global object to tell the game if it should display the game title.</p>
+<pre data-line="18-19"><code class="language-javascript">let gameOptions = {
+    defaultSize: {
+        width: 750,
+        height: 1334,
+        maxRatio: 4 / 3
+    },
+    platformGapRange: [200, 400],
+    platformWidthRange: [50, 150],
+    scrollTime: 250,
+    platformHeight: 0.6,
+    dangerZoneWidth: 20,
+    poleWidth: 8,
+    poleGrowTime: 400,
+    poleRotateTime: 500,
+    heroWalkTime: 2,
+    heroFallTime: 500,
+
+    // do we have to show the GUI?
+    showGUI: true
+}</code></pre>
+<p>No need to say we must preload new images: the sprite sheet and the logo have to be loaded in <code>preload</code> method of <code>preloadGame</code> class.</p>
+<p><code>icons.png</code> is a 150x150 sprite sheet.</p>
+<pre data-line="8,17-19"><code class="language-javascript">preload(){
+    this.load.image("background", "assets/sprites/background.png");
+    this.load.image("tile", "assets/sprites/tile.png");
+    this.load.image("dangertile", "assets/sprites/dangertile.png");
+    this.load.image("title", "assets/sprites/title.png");
+    this.load.image("info", "assets/sprites/info.png");
+    this.load.image("playbutton", "assets/sprites/playbutton.png");
+    this.load.image("logo", "assets/sprites/logo.png");
+    this.load.spritesheet("cloud", "assets/sprites/cloud.png", {
+        frameWidth: 256,
+        frameHeight: 256
+    });
+    this.load.spritesheet("hero", "assets/sprites/hero.png", {
+        frameWidth: 77,
+        frameHeight: 97
+    });
+    this.load.spritesheet("icons", "assets/sprites/icons.png", {
+        frameWidth: 150,
+        frameHeight: 150
+    })
+}</code></pre>
+<p>Back to <code>playGame</code> class, in <code>create</code> method we decide whether to show game title or jump straight to the game.</p>
+<pre data-line="9-10,13,15-18"><code class="language-javascript">create(){
+    this.addBackground();
+    this.addPlatforms();
+    this.addDangerZone();
+    this.addPole();
+    this.addPlayer();
+    this.addClouds();
+
+    // do we have to show the GUI?
+    if(gameOptions.showGUI){
+        this.addGameTitle();
+        this.gameMode = IDLE;
+    }
+
+    // or should we rather jump straight to the game?
+    else{
+        this.addGameInfo();
+    }
+    this.input.on("pointerdown", this.handlePointerDown, this);
+    this.input.on("pointerup", this.handlePointerUp, this);
+}</code></pre>
+<p>At the end of <code>fallAndDie</code> method, we call a new method, <code>showGameOver</code>, which handles game over buttons.</p>
+<pre data-line="12-13"><code class="language-javascript">fallAndDie(){
+    this.tweens.add({
+        targets: [this.hero],
+        y: game.config.height + this.hero.displayHeight * 2,
+        angle: 180,
+        duration: gameOptions.heroFallTime,
+        ease: "Cubic.easeIn",
+        callbackScope: this,
+        onComplete: function(){
+            this.cameras.main.shake(200, 0.01);
+
+            // at this time call showGameOver method
+            this.showGameOver();
+        }
+    })
+}</code></pre>
+<p>What about <code>showGameOver</code>? There's nothing new in it, we just add interactive sprites and remove unnecessary stuff.</p>
+<pre><code class="language-javascript">showGameOver(){
+    let halfGameWidth = game.config.width / 2;
+
+    // add restart icon, outside the screen off the bottom
+    let restartIcon = this.add.sprite(halfGameWidth - 120, game.config.height + 150, "icons");
+
+    // set restart icon interactive
+    restartIcon.setInteractive();
+
+    // when the input is released...
+    restartIcon.on("pointerup", function(){
+
+        // set showGUI to false
+        gameOptions.showGUI = false;
+
+        // restart the scene
+        this.scene.start("PlayGame");
+    }, this);
+
+    // add home icon, outside the screen off the bottom
+    let homeIcon = this.add.sprite(halfGameWidth + 120, game.config.height + 150, "icons");
+
+    // set frame number to show the proper icon
+    homeIcon.setFrame(1)
+
+    // set home icon interactive
+    homeIcon.setInteractive();
+
+    // when the input is released...
+    homeIcon.on("pointerup", function(){
+
+        // set showGUI to true
+        gameOptions.showGUI = true;
+
+        // restart the scene
+        this.scene.start("PlayGame");
+    }, this);
+
+    // tween to turn transparent the danger zone, the pole, and the platforms
+    this.tweens.add({
+        targets: [this.dangerZone, this.pole, this.platforms[0], this.platforms[1]],
+        alpha: 0,
+        duration: 800,
+        ease: "Cubic.easeIn"
+    })
+
+    // tween to make home and menu icons enter the screen from the bottom
+    this.tweens.add({
+        targets: [restartIcon, homeIcon],
+        y: game.config.height / 2,
+        duration: 800,
+        ease: "Cubic.easeIn"
+    })
+
+    // add developer logo - yes, it's me - outside the screen off the bottom
+    let logo = this.add.sprite(game.config.width / 2, game.config.height + 150, "logo");
+
+    // set the logo interactive
+    logo.setInteractive();
+
+    // when the input is released...
+    logo.on("pointerup", function(){
+
+        // open my blog
+        window.location.href = "https://www.emanueleferonato.com/"
+    }, this);
+
+// tween to make logo enter the screen from the bottom
+    this.tweens.add({
+        targets: [logo],
+        y: game.config.height / 4 * 3,
+        duration: 800,
+        ease: "Cubic.easeIn"
+    })
+}</code></pre>
+<p>The main concept is to set <code>gameOptions.showGUI</code> to <code>true</code> or <code>false</code> then restart the scene.</p>
+<div class="alert alert-primary" role="alert">
+    <h3><code>window.location.href</code></h3>
+    <p>Get the current page address or redirects the browser to a new page.</p>
+</div>
+<p>At this time we can say the game is almost complete.</p>
+</div>
+
+<div class = "coursepage" id = "coursepage14">
+<h1>Add a time and score system</h1>
+<p>What's the point in playing an hyper casual game? Yeah, getting a six figure score.</p>
+<p>You probably won't get such a high score, but we are going to add a score and time system to the game.</p>
+<div class="alert alert-success" role="alert">
+    <ul>
+        <li><strong>What we want</strong>: add a score system to the game, saving it and displaying it. Add a time countdown as well.</li>
+        <li><strong>How we do it</strong>: we need to create a timed event and find a way to display dynamic text.</li>
+    </ul>
+</div>
+<p>At the beginning of the game, you have an amount of seconds to run across as much platforms as you can.</p>
+<p>Time runs away, but you can have some extra seconds if you make the pole land on the danger zone.</p>
+<p>We need to add two new variables in global <code>gameOptions</code> object, and we'll add one more variable to declare the string we use to refer to the local storage object where we save the best score.</p>
+<div class="alert alert-warning" role="alert">
+    <p>We use local storage to save your best score, and keep it saved even if you close the browser window or turn off your computer or device.</p>
+    <p>All modern browsers support local storage, a way used by web pages to locally store data in a key/value notation.</p>
+    <p>The information you save continues to be stored even when you shut down your device and can be read every time you launch your game.</p>
+</div>
+<p>Let's start by adding values to <code>gameOptions</code> object:</p>
+<pre data-line="19-26"><code class="language-javascript">let gameOptions = {
+    defaultSize: {
+        width: 750,
+        height: 1334,
+        maxRatio: 4 / 3
+    },
+    platformGapRange: [200, 400],
+    platformWidthRange: [50, 150],
+    scrollTime: 250,
+    platformHeight: 0.6,
+    dangerZoneWidth: 20,
+    poleWidth: 8,
+    poleGrowTime: 400,
+    poleRotateTime: 500,
+    heroWalkTime: 2,
+    heroFallTime: 500,
+    showGUI: true,
+
+    // amount of seconds you get for hitting the danger zone with the pole
+    bonusTime: 3,
+
+    // string to refer the local storage object which saves the best score
+    localStorageName: "irresponsible",
+
+    // initial time, if you don't get any bonus, game ends in 30 seconds
+    initialTime: 30
+}</code></pre>
+<p>Before we add and preload new images to the project, it's time to introduce bitmap fonts.</p>
+<p>We need to show player score, and in order to do it with the highest level of customization possible we need to introduce bitmap fonts, so unfortunately a bit of boring theory is needed.</p>
+<div class="alert alert-warning" role="alert">
+    <p>All text displayed in your browser is rendered using a font file which contains all the necessary information to draw the shape of each character, no matter the size and scale.</p>
+    <p>When you print a string on the screen, each character is scaled and rendered, leading to two problems:</p>
+    <ol>
+        <li>The process of scaling and rendering characters is quite CPU intensive, especially if you need to add run-time effects like colors, outlines or shadows.</li>
+        <li>If you don't use a common font it's very likely most players won't have that font installed on their computers or mobile devices, so they won't be able to properly render it and a default font is be used instead.</li>
+    </ol>
+    <p>This is where bitmap fonts come into play.</p>
+    <p>Basically, a bitmap font is an image file containing all the characters we need and a control file with the coordinates of each character in the image.</p>
+    <p>You may think about bitmap fonts as a special sprite sheet with letters and numbers.</p>
+    <p>With bitmap fonts each character can be created using multiple effects, loaded as an image, and placed to the screen using very little resources.</p>
+    <p>The drawback is each bitmap font file can contain only one font size, but it won't be a problem in our case.</p>
+</div>
+<p>There is a wide choice of tools to generate bitmap fonts, but the one I prefer – and actually use – is Littera bitmap font generator (<a href = "http://kvazars.com/littera/" target = "_blank">http://kvazars.com/littera/</a>), a free web application to generate bitmap fonts with all options you need.</p>
+<p>It's very easy to use and when you export the font you can keep the default settings so you gets two files: a <code>png</code> file which is the image containing all characters and a <code>fnt</code> file containing font information.</p>
+<p>This is the image I created with Littera for my font, displayed on a green background to allow you to see the transparency:</p>
+<p><img src = "images/14/font.png"></p>
+<p>This image is be saved as <code>assets/fonts/font.png</code>, along with <code>assets/fonts/font.fnt</code> font file.</p>
+<p>We are using other images too: <code>assets/sprites/energybar.png</code>, green background has been added to show you the transparency, is the container of the time/energy.</p>
+<p><img src = "images/14/energybar.png"></p>
+<p><code>assets/sprites/whitetile.png</code>, fills the container according to time left.</p>
+<p><img src = "images/14/whitetile.png"></p>
+<p><code>assets/sprites/clock.png</code>, green background has been added to show you the transparency, is a clock icon to be shown if the player hits the danger zone and gets a time bonus.</p>
+<p><img src = "images/14/clock.png"></p>
+<p>Let's preload all this stuff in <code>preload</code> method of <code>preloadGame</code> class:</p>
+<pre data-line="25-26"><code class="language-javascript">preload(){
+    this.load.image("background", "assets/sprites/background.png");
+    this.load.image("tile", "assets/sprites/tile.png");
+    this.load.image("dangertile", "assets/sprites/dangertile.png");
+    this.load.image("title", "assets/sprites/title.png");
+    this.load.image("info", "assets/sprites/info.png");
+    this.load.image("playbutton", "assets/sprites/playbutton.png");
+    this.load.image("logo", "assets/sprites/logo.png");
+    this.load.image("clock", "assets/sprites/clock.png");
+    this.load.image("energybar", "assets/sprites/energybar.png");
+    this.load.image("whitetile", "assets/sprites/whitetile.png");
+    this.load.spritesheet("cloud", "assets/sprites/cloud.png", {
+        frameWidth: 256,
+        frameHeight: 256
+    });
+    this.load.spritesheet("hero", "assets/sprites/hero.png", {
+        frameWidth: 77,
+        frameHeight: 97
+    });
+    this.load.spritesheet("icons", "assets/sprites/icons.png", {
+        frameWidth: 150,
+        frameHeight: 150
+    });
+
+    // this is how we preload a bitmap font
+    this.load.bitmapFont("font", "assets/fonts/font.png", "assets/fonts/font.fnt");
+}</code></pre>
+<p>The only new concept here is the way we preload the bitmap font.</p>
+<div class="alert alert-primary" role="alert">
+    <h3><code>load.bitmapFont(key, texturePath, xmlPath)</code></h3>
+    <p>Adds new bitmap font loading request, giving it unique <code>key</code> name and looking for <code>texturePath</code> image file and <code>xmlPath</code> data file.</p>
+</div>
+<p>In <code>create</code> method of <code>playGame</code> class we now look for a previously saved high score and initialize variables to keep track of the time and the score.</p>
+<pre data-line="3-17"><code class="language-javascript">create(){
+
+    // read best score from local storage
+    this.bestScore = localStorage.getItem(gameOptions.localStorageName);
+
+    // if there is no best score saved...
+    if(this.bestScore == null){
+
+        // set it to zero
+        this.bestScore = 0;
+    }
+
+    // mountains is the score itself: the more platforms you cross, the higher the score
+    this.mountains = 0;
+
+    // set time left
+    this.timeLeft = gameOptions.initialTime;
+    this.addBackground();
+    this.addPlatforms();
+    this.addDangerZone();
+    this.addPole();
+    this.addPlayer();
+    this.addClouds();
+    if(gameOptions.showGUI){
+        this.addGameTitle();
+        this.gameMode = IDLE;
+    }
+    else{
+        this.addGameInfo();
+    }
+    this.input.on("pointerdown", this.handlePointerDown, this);
+    this.input.on("pointerup", this.handlePointerUp, this);
+}</code></pre>
+<p>The most important part is the use of local storage to retrieve the best score, if any, or set it to zero.</p>
+<div class="alert alert-primary" role="alert">
+    <h3><code>localStorage.getItem(keyName)</code></h3>
+    <p>Returns <code>keyName</code>'s value or <code>null</code> if <code>keyName</code> does not exist.</p>
+    <h3><code>null</code></h3>
+    <p>Represents JavaScript's intentional absence of any value.</p>
+</div>
+<p>Then with <code>mountains</code> and <code>timeLeft</code> we keep track respectively of the score - the platforms crossed - and the time left.</p>
+<p>When the pole hits the danger zone, we want the little clock icon to pop up to show we won a time bonus.</p>
+<p>We are going to add these two lines to <code>addDangerzone</code> method:</p>
+<pre data-line="8-12"><code class="language-javascript">addDangerZone(){
+    this.dangerZone = this.add.sprite(0, this.platforms[this.mainPlatform].y, "dangertile");
+    this.dangerZone.setOrigin(0, 0);
+    this.dangerZone.displayWidth = gameOptions.dangerZoneWidth;
+    this.dangerZone.displayHeight = 10;
+    this.dangerZone.visible = false;
+
+    // add clock sprite...
+    this.extraTime = this.add.sprite(0, 0, "clock");
+
+    // ... and make it invisible
+    this.extraTime.visible = false;
+}</code></pre>
+<p>We just merely added the clock icon, <code>extraTime</code>, so its placement is managed by <code>placeDangerZone method</code>:</p>
+<pre data-line="11-19"><code class="language-javascript">placeDangerZone(){
+    this.dangerZone.visible = true;
+    let platformBound = this.platforms[1 - this.mainPlatform].getBounds().right;
+    if(Phaser.Math.Between(0, 1) == 0){
+        this.dangerZone.x = this.platforms[1 - this.mainPlatform].x
+    }
+    else{
+        this.dangerZone.x = platformBound - gameOptions.dangerZoneWidth;
+    }
+
+    // place clock icon a little above the danger zone
+    this.extraTime.x = this.dangerZone.getBounds().centerX;
+
+    // with the alpha set to 1 - fully opaque
+    this.extraTime.alpha = 1;
+    this.extraTime.y = this.platforms[this.mainPlatform].y - 30
+
+    // not visible
+    this.extraTime.visible = false;
+}</code></pre>
+<p><code>extraTime</code> sprite is placed a bit above the danger zone, with its <code>alpha</code> at <code>1</code> - fully opaque - but not visible.</p>
+<p>What's the point of setting it opaque but not visible?</p>
+<p>We are going to fade it away if the player hits the danger zone.</p>
+<p>At the moment, we have to know if this is the first move for our ninja.</p>
+<p>We want the timer to start only when the pole starts to grow for the first time.</p>
+<p>This is why in <code>addGameInfo</code> method we introduce <code>firstMove</code> property, initially set to <code>true</code> because it's actually the first ninja move.</p>
+<pre data-line="5-6"><code class="language-javascript">addGameInfo(){
+    this.info = this.add.sprite(game.config.width / 2, game.config.height / 4, "info");
+    this.gameMode = WAITING_FOR_INPUT_START;
+
+    // it's the first move
+    this.firstMove = true;
+}</code></pre>
+<p>Ready for the first move? As soon as a pointer down event is fired, <code>handlePointerDown</code> method is called with a couple of lines of new code:</p>
+<pre data-line="11-22"><code class="language-javascript">handlePointerDown(){
+    if(this.gameMode == WAITING_FOR_INPUT_START){
+        this.gameMode = WAITING_FOR_INPUT_STOP;
+        let maxPoleWidth = gameOptions.platformGapRange[1] + gameOptions.platformWidthRange[1];
+        this.growTween = this.tweens.add({
+            targets: [this.pole],
+            displayHeight: maxPoleWidth + 50,
+            duration: gameOptions.poleGrowTime
+        });
+
+        // is this the first move?
+        if(this.firstMove){
+
+            // hide game information
+            this.info.visible = false;
+
+            // method to show the score
+            this.showGameScore();
+
+            // method to add the timer
+            this.addGameTimer();
+        }
+    }
+}</code></pre>
+<p>This way on the first move we turn game info to invisible and call two new methods to show game score and handle timer.</p>
+<p>Let's start with <code>showGameScore</code> which shows current score, best score and the energy bar which consumes second after second.</p>
+<pre><code class="language-javascript">showGameScore(){
+
+    // not the first move anymore
+    this.firstMove = false;
+
+    // add the energy bar in the horizontal center, vertical 1/5 of game height
+    let energyBar = this.add.sprite(game.config.width / 2, game.config.height / 5, "energybar");
+
+    // get energyBar bounds
+    let energyBounds = energyBar.getBounds();
+
+    // add the bitmap text representing the score
+    this.scoreText = this.add.bitmapText(energyBounds.right, energyBounds.top - 40, "font", 	"DISTANCE: " + this.mountains.toString());
+    this.scoreText.setOrigin(1, 0);
+
+    // add the bitmap text representing the best score
+    this.bestScoreText = this.add.bitmapText(energyBounds.left, energyBounds.bottom + 10, "font", 	"MAX DISTANCE: " + this.bestScore.toString());
+    this.bestScoreText.setOrigin(0, 0);
+
+    // fill energy bar with a white tile
+    this.energyStatus = this.add.sprite(energyBounds.left + 5, energyBounds.top + 5, "whitetile");
+    this.energyStatus.setOrigin(0, 0);
+    this.energyStatus.displayWidth = 500;
+    this.energyStatus.displayHeight = energyBounds.height - 10;
+}</code></pre>
+<p>The idea is to display the energy bar - <code>energyBar</code> sprite - and fill it with a white sprite - <code>energyStatus</code>.</p>
+<p>Resizing <code>energyStatus</code> each second results in an energy bar consuming second after second.</p>
+<p>Also, two bitmap texts have been added to show current score and best score.</p>
+<div class="alert alert-primary" role="alert">
+    <h3><code>add.bitmapText(x, y, key, text)</code></h3>
+    <p>Adds <code>text</code> string written with <code>key</code> bitmap text at coordinates <code>x</code>, <code>y</code>.</p>
+    <h3><code>toString()</code></h3>
+    <p>Converts a number to a string.</p>
+</div>
+<p>Enough with the score, let's create <code>addGameTimer</code> method to manage time:</p>
+<pre><code class="language-javascript">addGameTimer(){
+
+    // create a time event
+    this.gameTimer = this.time.addEvent({
+
+        // event delay, in milliseconds
+        delay: 1000,
+
+        // callback function
+        callback: function(){
+
+            // decrease timeLeft property
+            this.timeLeft --;
+
+            // method to update the timer on the screen
+            this.updateTimer();
+        },
+
+        // scope of callback function
+        callbackScope: this,
+
+        // execute the event forever
+        loop: true
+    });
+}</code></pre>
+<p><code>addGameTimer</code> method just adds a timer event, which is somehow similar to a tween, with its callback function and callback scope.</p>
+<p>We only have to define a delay, in milliseconds, and decide whether it's a single time event or a loop.</p>
+<div class="alert alert-primary" role="alert">
+    <h3><code>time.addEvent(object)</code></h3>
+    <p>Creates a Time event with <code>object</code> options, including:</p>
+    <ul>
+        <li><code>delay</code>: the delay after which the Timer Event should fire, in milliseconds.</li>
+        <li><code>loop</code>: <code>true</code> if the Timer Event should repeat indefinitely.</li>
+        <li><code>callback</code>: the callback which is called when the Timer Event fires.</li>
+        <li><code>callbackScope</code>: the scope with which to invoke the callback.</li>
+    </ul>
+</div>
+<p>This way, each second we decrease time left and call <code>updateTimer</code> method:</p>
+<pre><code class="language-javascript">updateTimer(){
+
+    // resize energy according to time left
+    this.energyStatus.displayWidth = 500 * this.timeLeft / gameOptions.initialTime;
+
+    // did we run out of time?
+    if(this.timeLeft == 0){
+
+        // stop tweening the hero
+        this.tweens.killTweensOf(this.hero);
+
+        // stop tweening the pole
+        this.tweens.killTweensOf(this.pole);
+
+        // call fallAndDie method
+        this.fallAndDie();
+    }
+}</code></pre>
+<p>This is pretty straightforward: we resize <code>energyStatus</code> so you see your energy/health bar draining as time passes.</p>
+<p>When <code>timeLeft</code> reaches zero, we stop all tweens and call <code>fallAndDie</code> method.</p>
+<p>Once the time is over, we just want the ninja to stop the current action, fall and die.</p>
+<div class="alert alert-primary" role="alert">
+    <h3><code>tweens.killTweensOf(target)</code></h3>
+    <p>Stops all Tweens which affect <code>target</code>.</p>
+</div>
+<p>In <code>fallAndDie</code> method we just add one line to remove the timer.</p>
+<pre data-line="3-4"><code class="language-javascript">fallAndDie(){
+
+    // remove Time event
+    this.gameTimer.remove();
+    this.tweens.add({
+        targets: [this.hero],
+        y: game.config.height + this.hero.displayHeight * 2,
+        angle: 180,
+        duration: gameOptions.heroFallTime,
+        ease: "Cubic.easeIn",
+        callbackScope: this,
+        onComplete: function(){
+            this.cameras.main.shake(200, 0.01);
+            this.showGameOver();
+        }
+    })
+}</code></pre>
+<p>No matter the wat the ninja dies, we have to remove the timer to prevent it to keep running.</p>
+<div class="alert alert-primary" role="alert">
+    <h3><code>remove</code></h3>
+    <p>Forces the Timer Event to immediately expire.</p>
+</div>
+<p>Done with the timer at the moment, let's work on the score.</p>
+<p>Each time the ninja lands successfully on a platform, we have to increase the score and diplay it on the screen.</p>
+<p>Add a couple of lines to <code>prepareNextMove</code> method:</p>
+<pre data-line="3-7"><code class="language-javascript">prepareNextMove(){
+
+    // increase mountains
+    this.mountains ++;
+
+    // call updateScore method
+    this.updateScore();
+    this.platforms[this.mainPlatform].x = game.config.width;
+    this.platforms[this.mainPlatform].alpha = 1;
+    this.mainPlatform = 1 - this.mainPlatform;
+    this.tweenPlatform();
+    this.pole.angle = 0;
+    this.pole.alpha = 1;
+    this.pole.x = this.platforms[this.mainPlatform].getBounds().right - gameOptions.poleWidth;
+    this.pole.displayHeight = gameOptions.poleWidth;
+    this.gameMode = WAITING_FOR_INPUT_START;
+}</code></pre>
+<p><code>prepareNextMove</code> method is called once the ninja successfully lands on a new platform, so it's the right place to increase the score and show it with <code>updateScore</code> method:</p>
+<pre><code class="language-javascript">updateScore(){
+
+    // update text score
+    this.scoreText.setText("DISTANCE: " + this.mountains)
+
+    // if current score is higher than best score...
+    if(this.mountains > this.bestScore){
+
+        // update best score
+        this.bestScore = this.mountains;
+
+        // save best score to local storage
+        localStorage.setItem(gameOptions.localStorageName, this.bestScore);
+
+        // update best text score
+        this.bestScoreText.setText("MAX DISTANCE: " + this.bestScore.toString());
+    }
+}</code></pre>
+<p>We delegate to <code>updateScore</code> the task of update texts and save best score, if needed.</p>
+<div class="alert alert-primary" role="alert">
+    <h3><code>setText(string)</code></h3>
+    <p>Set the content of this BitmapText to <code>string</code>.</p>
+</div>
+<p>If current score is higher than best score, we update and save best score immediately.</p>
+<p>This way we have the best score saved even if the window is closed before game ends.</p>
+<div class="alert alert-primary" role="alert">
+    <h3><code>localStorage.setItem(keyName, keyValue)</code></h3>
+    <p>Adds <code>keyName</code> to the local storage, or updates it to <code>keyValue</code> if it already exists.</p>
+</div>
+<p>Finally one last step: handling the time bonus if the pole lands on the danger zone.</p>
+<p>In <code>handlePointerUp</code> method we see if this happened.</p>
+<pre data-line="14-39"><code class="language-javascript">handlePointerUp(){
+    if(this.gameMode == WAITING_FOR_INPUT_STOP){
+        this.gameMode = IDLE;
+        this.growTween.stop();
+        this.tweens.add({
+            targets: [this.pole],
+            angle: 90,
+            duration: gameOptions.poleRotateTime,
+            ease: "Bounce.easeOut",
+            callbackScope: this,
+            onComplete: function(){
+                let poleBounds = this.pole.getBounds();
+
+                // get danger zone bounds
+                let dangerBounds = this.dangerZone.getBounds();
+
+                // if the right end of the pole is inside the danger zone...
+                if(poleBounds.right >= dangerBounds.left && poleBounds.right <= dangerBounds.right){
+
+                    // show clock icon
+                    this.extraTime.visible = true;
+
+                    // the actual time would be remaining time + bonus time...
+                    let actualTime = this.timeLeft + gameOptions.bonusTime;
+
+                    // ... but we do not want time left to be greater than initial time
+                    this.timeLeft = Math.min(actualTime, gameOptions.initialTime);
+
+                    // tween to make the clock fade away and move up
+                    this.timeTween = this.tweens.add({
+                        targets: [this.extraTime],
+                        y: this.extraTime.y - 100,
+                        alpha: 0,
+                        duration: 500
+                    })
+
+                    // call updateTimer method to visually update time bar
+                    this.updateTimer();
+                }
+                let platformBounds = this.platforms[1 - this.mainPlatform].getBounds();
+                let poleStatus = POLE_SUCCESSFUL;
+                if(poleBounds.right < platformBounds.left){
+                    poleStatus = POLE_TOO_SHORT;
+                }
+                else{
+                    if(poleBounds.right > platformBounds.right){
+                        poleStatus = POLE_TOO_LONG;
+                    }
+                }
+                this.moveHero(poleStatus);
+            }
+        })
+    }
+}</code></pre>
+<p>What happened? We just checked pole and danger zone bounds to see if the right end of the pole is inside the danger zone.</p>
+<p>Then we show the clock icon with a tween to make it fade away while moving up a bit.</p>
+<p><code>timeLeft</code> is also updated but we don't want it to be greater than initial time.</p>
+<div class="alert alert-primary" role="alert">
+    <h3><code>Math.min(n1, n2, n3, ..., nI)</code></h3>
+    <p>Returns the lowest number of the arguments.</p>
+</div>
+<p>Now you are finally able to play the complete game.</p>
+<p>Try to land on the danger zone to gain extra time.</p>
+</div>
+
+<div class = "coursepage" id = "coursepage15">
+<h1>Add sounds to the game</h1>
+<p>Every respectable game has sounds, which can be turned on or off.</p>
+<div class="alert alert-success" role="alert">
+    <ul>
+        <li><strong>What we want</strong>: add sounds to the game.</li>
+        <li><strong>How we do it</strong>: add the capability of playing <code>mp3</code> and <code>ogg</code> files, and also add a button to enable/disable sound effects.</li>
+    </ul>
+</div>
+<p>Six different sounds have been added to <code>assets/sounds</code> folder:</p>
+<ul>
+    <li><code>click.mp3</code> and <code>click.ogg</code>: a "click" sound to be played when a button is clicked.</li>
+    <li><code>death.mp3</code> and <code>death.ogg</code>: sound to be played when the ninja dies.</li>
+    <li><code>grow.mp3</code> and <code>grow.ogg</code>: sound to be played while the pole grows.</li>
+    <li><code>pick.mp3</code> and <code>pick.ogg</code>: sound to be played when the minja collects the "extra time" clock.</li>
+    <li><code>run.mp3</code> and <code>run.ogg</code>: sound to be played when the ninja runs.</li>
+    <li><code>stick.mp3</code> and <code>stick.ogg</code>: sound to be played when the pole hits the ground.</li>
+</ul>
+<div class="alert alert-warning" role="alert">
+    <p>Sounds have been added in two different formats: <code>mp3</code> and <code>ogg</code>.</p>
+    <p>Why did I use two sound formats?</p>
+    <p>It's a compatibility matter: not all browsers are capable to reproduce all kind of sound files. Using <code>mp3</code> and <code>ogg</code> together should grant the best device and browser coverage.</p>
+</div>
+<p>Some publishers may want your game with sounds enabled by default, some other publishers may want your game with sounds disabled by default.</p>
+<p>A <code>soundOn</code> property in gameOptions global object alows us to easily handle these preferences:<p>
+<pre data-line="22-23"><code class="language-javascript">let gameOptions = {
+    defaultSize: {
+        width: 750,
+        height: 1334,
+        maxRatio: 4 / 3
+    },
+    platformGapRange: [200, 400],
+    platformWidthRange: [50, 150],
+    scrollTime: 250,
+    platformHeight: 0.6,
+    dangerZoneWidth: 20,
+    poleWidth: 8,
+    poleGrowTime: 400,
+    poleRotateTime: 500,
+    heroWalkTime: 2,
+    heroFallTime: 500,
+    showGUI: true,
+    bonusTime: 3,
+    localStorageName: "irresponsible",
+    initialTime: 30,
+
+    // do we have to play sounds?
+    soundOn: true
+}</code></pre>
+<p>What should we do each time we add a new asset to the game?</p>
+<p>Yes, we have to preload it, in <code>preload</code> method of <code>preloadGame</code> class.</p>
+<pre data-line="26-32"><code class="language-javascript">preload(){
+    this.load.image("background", "assets/sprites/background.png");
+    this.load.image("tile", "assets/sprites/tile.png");
+    this.load.image("dangertile", "assets/sprites/dangertile.png");
+    this.load.image("title", "assets/sprites/title.png");
+    this.load.image("info", "assets/sprites/info.png");
+    this.load.image("playbutton", "assets/sprites/playbutton.png");
+    this.load.image("logo", "assets/sprites/logo.png");
+    this.load.image("clock", "assets/sprites/clock.png");
+    this.load.image("energybar", "assets/sprites/energybar.png");
+    this.load.image("whitetile", "assets/sprites/whitetile.png");
+    this.load.spritesheet("cloud", "assets/sprites/cloud.png", {
+        frameWidth: 256,
+        frameHeight: 256
+    });
+    this.load.spritesheet("hero", "assets/sprites/hero.png", {
+        frameWidth: 77,
+        frameHeight: 97
+    });
+    this.load.spritesheet("icons", "assets/sprites/icons.png", {
+        frameWidth: 150,
+        frameHeight: 150
+    });
+    this.load.bitmapFont("font", "assets/fonts/font.png", "assets/fonts/font.fnt");
+
+    // this is how we preload an audio file
+    this.load.audio("death", ["assets/sounds/death.mp3", "assets/sounds/death.ogg"]);
+    this.load.audio("run", ["assets/sounds/run.mp3", "assets/sounds/run.ogg"]);
+    this.load.audio("stick", ["assets/sounds/stick.mp3", "assets/sounds/stick.ogg"]);
+    this.load.audio("grow", ["assets/sounds/grow.mp3", "assets/sounds/grow.ogg"]);
+    this.load.audio("pick", ["assets/sounds/pick.mp3", "assets/sounds/pick.ogg"]);
+    this.load.audio("click", ["assets/sounds/click.mp3", "assets/sounds/click.ogg"]);
+}</code></pre>
+<p>Basically it's the same concept seen while loading other type of assets, it's just we are loading more files at once by placing them into an array.</p>
+<div class="alert alert-primary" role="alert">
+    <h3><code>load.audio(key, audioFiles)</code></h3>
+    <p>Handles sound preloading.</p>
+    <p>The first argument is the <code>key</code>, the unique name assigned to the sound.</p>
+    <p><code>audioFiles</code> is an array of files to be loaded, in different formats.</p>
+</div>
+<p>In <code>create</code> method inside <code>playGame</code> class, a new method is added to add all sounds:</p>
+<pre data-line="9-10"><code class="language-javascript">create(){
+    this.bestScore = localStorage.getItem(gameOptions.localStorageName);
+    if(this.bestScore == null){
+        this.bestScore = 0;
+    }
+    this.mountains = 0;
+    this.timeLeft = gameOptions.initialTime;
+
+    // method to add sounds to the game
+    this.addSounds();
+    this.addBackground();
+    this.addPlatforms();
+    this.addDangerZone();
+    this.addPole();
+    this.addPlayer();
+    this.addClouds();
+    if(gameOptions.showGUI){
+        this.addGameTitle();
+        this.gameMode = IDLE;
+    }
+    else{
+        this.addGameInfo();
+    }
+    this.input.on("pointerdown", this.handlePointerDown, this);
+    this.input.on("pointerup", this.handlePointerUp, this);
+}</pre></code>
+<p><code>addSounds</code> method adds all sounds to the game:</p>
+<pre><code class="language-javascript">addSounds(){
+
+    // creation of an object with all sounds
+    this.sounds = {
+
+        // this is how we add a sound to the game
+        death: this.sound.add("death"),
+        run: this.sound.add("run"),
+        stick: this.sound.add("stick"),
+        grow: this.sound.add("grow"),
+        pick: this.sound.add("pick"),
+        click: this.sound.add("click")
+    }
+}</code></pre>
+<p>The idea is to create an object with all sounds used in the game.</p>
+<div class="alert alert-primary" role="alert">
+    <h3><code>sound.add(key)</code></h3>
+    <p>Adds a new audio file to the sound manager. <code>key</code> is the unique name we gave to the sound.</p>
+</div>
+<p>At this time, all sounds have been preloaded and added to the game.</p>
+<p>Unlike sprites, which are visible as soon as they are added, sounds do not automatically play once added, so it's up to us to make them play.</p>
+<p>In <code>addGameTitle</code> method, we see how to play a sound when "Play" button is pressed and we are also going to add the "sound on / sound off" button.</p>
+<pre data-line="21-23,35-59"><code class="language-javascript">addGameTitle(){
+    this.guiGroup = this.add.group();
+    let blackOverlay = this.add.sprite(0, 0, "tile");
+    blackOverlay.setOrigin(0, 0);
+    blackOverlay.displayWidth = game.config.width;
+    blackOverlay.displayHeight = game.config.height;
+    blackOverlay.alpha = 0.8;
+    this.guiGroup.add(blackOverlay);
+    let title = this.add.sprite(game.config.width / 2, 50, "title");
+    title.setOrigin(0.5, 0);
+    this.guiGroup.add(title);
+    let playButtonX = game.config.width / 2;
+    let playButtonY = game.config.height / 2 - 20;
+    let playButton = this.add.sprite(playButtonX, playButtonY, "playbutton");
+    playButton.setInteractive();
+    playButton.on("pointerup", function(){
+        this.guiGroup.toggleVisible();
+        this.guiGroup.active = false;
+        this.cameras.main.flash();
+
+        // playSound method handles sound reproduction.
+        // the sound to be played is passed as argument
+        this.playSound(this.sounds.click);
+        this.addGameInfo();
+    }, this);
+    this.guiGroup.add(playButton);
+    this.tweens.add({
+        targets: [playButton],
+        y: game.config.height / 2 + 20,
+        duration: 5000,
+        yoyo: true,
+        repeat: -1
+    })
+
+    // add the sound icon
+    let soundButton = this.add.sprite(playButtonX, playButtonY + 300, "icons");
+
+    // set the proper frame according to soundOn value
+    soundButton.setFrame(gameOptions.soundOn ? 2 : 3);
+
+    // make sound button interactive
+    soundButton.setInteractive();
+
+    // when the player released the input...
+    soundButton.on("pointerup", function(){
+
+        // invert soundOn value
+        gameOptions.soundOn = !gameOptions.soundOn;
+
+        // set the proper frame according to soundOn value
+        soundButton.setFrame(gameOptions.soundOn ? 2 : 3);
+
+        // playSound method handles sound reproduction.
+        // the sound to be played is passed as argument
+        this.playSound(this.sounds.click)
+    }, this);
+
+    // sound button is also part of GUI group
+    this.guiGroup.add(soundButton);
+}</code></pre>
+<p>There are two interesting things in this script. First, we delegate the action of actually play a sound to <code>playSound</code> method we are going to write.</p>
+<p>Second, <code>soundButton</code> sprite shows frame 2 or 3 according to <code>gameOptions.soundOn</code> value.</p>
+<p>To do this, we are using a conditional operator.</p>
+<div class="alert alert-primary" role="alert">
+    <h3><code>condition ? expr1 : expr2</code></h3>
+    <p>A <strong>conditional operator</strong> returns the value of <code>expr1</code> if <code>condition</code> is <code>true</code>, or the value of <code>expr2</code> if <code>condition</code> is <code>false</code>.</p>
+    <p>Think about it as a short <code>if</code> statement like<p>
+    <pre><code>if(condition){
+    expr1
+}
+else{
+    expr2
+}</code></pre>
+    <p>The conditional operator can also be called ternary operator because it has three operands.</p>
+</div>
+<p>Now, let's focus on <code>playSound</code> method which handles sounds.</p>
+<p>The first argument is the sound itself, the second is an object with sound options, if any.</p>
+<pre><code class="language-javascript">playSound(sound, options){
+
+    // if we have to play a sound...
+    if(gameOptions.soundOn){
+
+        // ... let's play it
+        sound.play("", options);
+    }
+}</code></pre>
+<p>Remember we play a sound only if <code>gameOptions.soundOn</code> is set to <code>true</code>.</p>
+<div class="alert alert-primary" role="alert">
+    <h3><code>play(marker, config)</code></h3>
+    <p>Plays the sound, or a marked section of it starting from <code>marker</code>.</p>
+    <p>Optional sound <code>config</code> object can be applied this way:</p>
+    <ul>
+        <li><code>mute</code>: Boolean indicating whether the sound should be muted or not.</li>
+        <li><code>volume</code>: value between 0 (silence) and 1 (full volume).</li>
+        <li><code>rate</code>: defines the speed at which the sound should be played.</li>
+        <li><code>detune</code>: represents detuning of sound in cents.</li>
+        <li><code>seek</code>: position of playback for this sound, in seconds.</li>
+        <li><code>loop</code>: whether or not the sound or current sound marker should loop.</li>
+        <li><code>delay</code>: Time, in seconds, that should elapse before the sound actually starts its playback.</li>
+    </ul>
+</div>
+<p>We created a method called <code>playSound</code> to play sounds, let's create <code>stopSound</code> too, to stop a sound.</p>
+<pre><code class="language-javascript">stopSound(sound){
+
+    // just stop the sound
+    sound.stop();
+}</code></pre>
+<p>As you can see it's just a wrapper for <code>stop</code> method, but it's nice to have <code>playSound</code> and <code>stopSound</code> to handle sounds.</p>
+<div class="alert alert-primary" role="alert">
+    <h3><code>stop()</code></h3>
+    <p>Stops a sound.</p>
+</div>
+<p>Now it's only a matter of adding and stopping sounds here and there in the game, where required, like in <code>handlePointerDown</code> method.</p>
+<p>We play "grow" sound as long as <code>growTween</code> is running.</p>
+<pre data-line="6-7,13-20,"><code class="language-javascript">handlePointerDown(){
+    if(this.gameMode == WAITING_FOR_INPUT_START){
+        this.gameMode = WAITING_FOR_INPUT_STOP;
+        let maxPoleWidth = gameOptions.platformGapRange[1] + gameOptions.platformWidthRange[1];
+
+        // try to play "grow" sound
+        this.playSound(this.sounds.grow);
+        this.growTween = this.tweens.add({
+            targets: [this.pole],
+            displayHeight: maxPoleWidth + 50,
+            duration: gameOptions.poleGrowTime,
+
+            // we need to fire an onComplete event
+            // to stop the sound
+            callbackScope: this,
+            onComplete: function(){
+
+                // stop "grow" sound
+                this.stopSound(this.sounds.grow);
+            }
+        });
+        if(this.firstMove){
+            this.info.visible = false;
+            this.showGameScore();
+            this.addGameTimer();
+        }
+    }
+}</code></pre>
+<p>In handlePointerUp we stop "grow" sound and play "stick" sound.</p>
+<p>Also, "pick" sound is played if the player collects extra time landing on the danger zone.</p>
+<pre data-line="5-9,22-23"><code class="language-javascript">handlePointerUp(){
+    if(this.gameMode == WAITING_FOR_INPUT_STOP){
+        this.gameMode = IDLE;
+
+        // stop "grow" sound
+        this.stopSound(this.sounds.grow);
+
+        // try to play "stick" sound
+        this.playSound(this.sounds.stick);
+        this.growTween.stop();
+        this.tweens.add({
+            targets: [this.pole],
+            angle: 90,
+            duration: gameOptions.poleRotateTime,
+            ease: "Bounce.easeOut",
+            callbackScope: this,
+            onComplete: function(){
+                let poleBounds = this.pole.getBounds();
+                let dangerBounds = this.dangerZone.getBounds();
+                if(poleBounds.right >= dangerBounds.left && poleBounds.right <= dangerBounds.right){
+
+                    // try to play "pick" sound
+                    this.playSound(this.sounds.pick);
+                    this.extraTime.visible = true;
+                    let actualTime = this.timeLeft + gameOptions.bonusTime;
+                    this.timeLeft = Math.min(actualTime, gameOptions.initialTime);
+                    this.timeTween = this.tweens.add({
+                        targets: [this.extraTime],
+                        y: this.extraTime.y - 100,
+                        alpha: 0,
+                        duration: 500
+                    })
+                    this.updateTimer();
+                }
+                let platformBounds = this.platforms[1 - this.mainPlatform].getBounds();
+                let poleStatus = POLE_SUCCESSFUL;
+                if(poleBounds.right &lt; platformBounds.left){
+                    poleStatus = POLE_TOO_SHORT;
+                }
+                else{
+                    if(poleBounds.right > platformBounds.right){
+                        poleStatus = POLE_TOO_LONG;
+                    }
+                }
+                this.moveHero(poleStatus);
+            }
+        })
+    }
+}</code></pre>
+<p>In <code>moveHero</code> method we play and stop "run" sound.</p>
+<pre data-line="19-20,28-29"><code class="language-javascript">moveHero(poleStatus){
+    let platformBounds = this.platforms[1 - this.mainPlatform].getBounds();
+    let heroBounds = this.hero.getBounds();
+    let poleBounds = this.pole.getBounds();
+    let heroDestination;
+    switch(poleStatus){
+        case POLE_SUCCESSFUL:
+            heroDestination = platformBounds.right - gameOptions.poleWidth;
+            break;
+        case POLE_TOO_SHORT:
+            heroDestination = poleBounds.right;
+            break;
+        case POLE_TOO_LONG:
+            heroDestination = poleBounds.right + heroBounds.width / 2;
+            break;
+    }
+    this.hero.anims.play("run");
+
+    // try to play "run" sound
+    this.playSound(this.sounds.run)
+    this.walkTween = this.tweens.add({
+        targets: [this.hero],
+        x: heroDestination,
+        duration: gameOptions.heroWalkTime * this.pole.displayHeight,
+        callbackScope: this,
+        onComplete: function(){
+
+            // stop "run" sound
+            this.stopSound(this.sounds.run)
+            switch(poleStatus){
+                case POLE_TOO_SHORT:
+                    this.poleFallDown();
+                    this.fallAndDie();
+                    break;
+                case POLE_TOO_LONG:
+                    this.fallAndDie();
+                    break;
+                case POLE_SUCCESSFUL:
+                    this.nextPlatform();
+                    break;
+            }
+        },
+        onUpdate: function(){
+            let heroBounds = this.hero.getBounds();
+            let poleBounds = this.pole.getBounds();
+            let platformBounds = this.platforms[1 - this.mainPlatform].getBounds();
+            if(heroBounds.centerX > poleBounds.left && heroBounds.centerX &lt; poleBounds.right){
+                this.hero.y = poleBounds.top;
+            }
+            else{
+                this.hero.y = platformBounds.top;
+            }
+        }
+    });
+}</code></pre>
+<p><code>fallAndDie</code> method plays "death" sound, with some delay to let the ninja hit the ground.</p>
+<pre data-line="4-7"><code class="language-javascript">fallAndDie(){
+    this.gameTimer.remove();
+
+    // try to play "death" sound with some delay
+    this.playSound(this.sounds.death, {
+        delay: gameOptions.heroFallTime / 2000
+    });
+    this.tweens.add({
+        targets: [this.hero],
+        y: game.config.height + this.hero.displayHeight * 2,
+        angle: 180,
+        duration: gameOptions.heroFallTime,
+        ease: "Cubic.easeIn",
+        callbackScope: this,
+        onComplete: function(){
+            this.cameras.main.shake(200, 0.01);
+            this.showGameOver();
+        }
+    })
+}</code></pre>
+<p>Finally <code>showGameOver</code> method plays "click" sound when the player presses a button.</p>
+<pre data-line="7-8,17-18"><code class="language-javascript">showGameOver(){
+    let halfGameWidth = game.config.width / 2;
+    let restartIcon = this.add.sprite(halfGameWidth - 120, game.config.height + 150, "icons");
+    restartIcon.setInteractive();
+    restartIcon.on("pointerup", function(){
+
+        // try to play "click" sound
+        this.playSound(this.sounds.click);
+        gameOptions.showGUI = false;
+        this.scene.start("PlayGame");
+    }, this);
+    let homeIcon = this.add.sprite(halfGameWidth + 120, game.config.height + 150, "icons");
+    homeIcon.setFrame(1)
+    homeIcon.setInteractive();
+    homeIcon.on("pointerup", function(){
+
+        // try to play "click" sound
+        this.playSound(this.sounds.click);
+        gameOptions.showGUI = true;
+        this.scene.start("PlayGame");
+    }, this);
+    this.tweens.add({
+        targets: [this.dangerZone, this.pole, this.platforms[0], this.platforms[1]],
+        alpha: 0,
+        duration: 800,
+        ease: "Cubic.easeIn"
+    })
+    this.tweens.add({
+        targets: [restartIcon, homeIcon],
+        y: game.config.height / 2,
+        duration: 800,
+        ease: "Cubic.easeIn"
+    })
+    let logo = this.add.sprite(game.config.width / 2, game.config.height + 150, "logo");
+    logo.setInteractive();
+    logo.on("pointerup", function(){
+        window.location.href = "https://www.emanueleferonato.com/"
+    }, this);
+    this.tweens.add({
+        targets: [logo],
+        y: game.config.height / 4 * 3,
+        duration: 800,
+        ease: "Cubic.easeIn"
+    })
+}</code></pre>
+<p>And you can enjoy your game: Irresponsible Ninja!</p>
+</div>
